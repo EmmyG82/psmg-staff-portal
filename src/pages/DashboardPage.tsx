@@ -1,10 +1,11 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { mockShifts, mockMessages, mockUnavailability } from "@/data/mockData";
-import { MOCK_USERS } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CalendarDays, MessageSquare, Users, CalendarOff, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format, parseISO } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const StatCard = ({ icon: Icon, label, value, to, color }: { icon: any; label: string; value: string | number; to: string; color: string }) => (
   <Link to={to}>
@@ -35,10 +36,18 @@ const formatTime = (t: string) => {
 const DashboardPage = () => {
   const { user, isAdmin } = useAuth();
 
+  const { data: staffCount = 0 } = useQuery({
+    queryKey: ["staff-count"],
+    queryFn: async () => {
+      const { count } = await supabase.from("profiles").select("*", { count: "exact", head: true });
+      return count || 0;
+    },
+    enabled: isAdmin,
+  });
+
   if (!user) return null;
 
   const today = new Date().toISOString().split("T")[0];
-  const staffUsers = MOCK_USERS.filter((u) => u.role === "staff");
 
   if (isAdmin) {
     const pendingLeave = mockUnavailability.filter((u) => u.status === "pending").length;
@@ -49,7 +58,7 @@ const DashboardPage = () => {
           <p className="text-sm text-muted-foreground">Admin Dashboard</p>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <StatCard icon={Users} label="Staff Members" value={staffUsers.length} to="/staff" color="bg-primary/10 text-primary" />
+          <StatCard icon={Users} label="Staff Members" value={staffCount} to="/staff" color="bg-primary/10 text-primary" />
           <StatCard icon={CalendarDays} label="Shifts Today" value={mockShifts.filter((s) => s.date === today).length} to="/roster" color="bg-secondary/10 text-secondary" />
           <StatCard icon={CalendarOff} label="Pending Leave" value={pendingLeave} to="/unavailability" color="bg-warning/10 text-warning" />
           <StatCard icon={MessageSquare} label="Messages" value={mockMessages.length} to="/messages" color="bg-success/10 text-success" />

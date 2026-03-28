@@ -5,29 +5,40 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Building2 } from "lucide-react";
+import { Building2, Loader2 } from "lucide-react";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const { login, user } = useAuth();
+  const [submitting, setSubmitting] = useState(false);
+  const { login, user, loading } = useAuth();
   const navigate = useNavigate();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-primary">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-foreground" />
+      </div>
+    );
+  }
 
   if (user) {
     navigate("/dashboard", { replace: true });
     return null;
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    const success = login(email, password);
-    if (success) {
-      navigate("/dashboard");
+    setSubmitting(true);
+    const result = await login(email, password);
+    if (result.error) {
+      setError(result.error);
     } else {
-      setError("Invalid email. Try corey@parkside.com or maria@parkside.com");
+      navigate("/dashboard");
     }
+    setSubmitting(false);
   };
 
   return (
@@ -71,15 +82,10 @@ const LoginPage = () => {
             {error && (
               <p className="text-sm text-destructive bg-destructive/10 rounded-lg p-2.5">{error}</p>
             )}
-            <Button type="submit" className="w-full h-12 text-base font-semibold">
-              Sign In
+            <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={submitting}>
+              {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : "Sign In"}
             </Button>
           </form>
-          <div className="mt-4 p-3 bg-muted rounded-lg">
-            <p className="text-xs text-muted-foreground text-center">
-              <strong>Demo:</strong> Use corey@parkside.com (admin) or maria@parkside.com (staff)
-            </p>
-          </div>
         </CardContent>
       </Card>
     </div>
