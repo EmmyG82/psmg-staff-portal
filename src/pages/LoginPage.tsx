@@ -85,6 +85,11 @@ const LoginPage = () => {
             <Button type="submit" className="w-full h-12 text-base font-semibold" disabled={submitting}>
               {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : "Sign In"}
             </Button>
+            <div className="text-center">
+              <Link to="/forgot-password" className="text-sm text-primary hover:underline">
+                Forgot your password?
+              </Link>
+            </div>
           </form>
         </CardContent>
       </Card>
