@@ -1,6 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import NotificationBell from "@/components/NotificationBell";
 
 const AppHeader = () => {
   const { user, logout } = useAuth();
@@ -14,15 +15,18 @@ const AppHeader = () => {
             {user?.role}
           </span>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={logout}
-          className="text-primary-foreground hover:bg-primary-foreground/10 h-9 gap-1.5"
-        >
-          <LogOut className="h-4 w-4" />
-          <span className="hidden sm:inline">Logout</span>
-        </Button>
+        <div className="flex items-center gap-1">
+          <NotificationBell />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={logout}
+            className="text-primary-foreground hover:bg-primary-foreground/10 h-9 gap-1.5"
+          >
+            <LogOut className="h-4 w-4" />
+            <span className="hidden sm:inline">Logout</span>
+          </Button>
+        </div>
       </div>
     </header>
   );
