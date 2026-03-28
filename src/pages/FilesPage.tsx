@@ -1,10 +1,11 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { mockFiles } from "@/data/mockData";
-import { MOCK_USERS } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, Image, Download, Upload, Folder } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const fileIcon = (type: string) => {
   if (type === "image") return <Image className="h-5 w-5 text-secondary" />;
@@ -14,10 +15,24 @@ const fileIcon = (type: string) => {
 const FilesPage = () => {
   const { user, isAdmin } = useAuth();
 
+  const { data: staffMembers = [] } = useQuery({
+    queryKey: ["staff-profiles"],
+    queryFn: async () => {
+      const { data: profiles } = await supabase.from("profiles").select("*");
+      const { data: roles } = await supabase.from("user_roles").select("*");
+      return (profiles || [])
+        .filter((p) => {
+          const role = roles?.find((r) => r.user_id === p.user_id)?.role;
+          return role === "staff" || !role;
+        })
+        .map((p) => ({ id: p.user_id, name: p.full_name || p.email, email: p.email }));
+    },
+    enabled: isAdmin,
+  });
+
   if (!user) return null;
 
   if (isAdmin) {
-    const staffMembers = MOCK_USERS.filter((u) => u.role === "staff");
     return (
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
