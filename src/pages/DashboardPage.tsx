@@ -1,13 +1,12 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { mockShifts, mockMessages, mockUnavailability } from "@/data/mockData";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarDays, MessageSquare, Users, CalendarOff, ChevronRight } from "lucide-react";
+import { CalendarDays, MessageSquare, Users, CalendarOff, ChevronRight, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-const StatCard = ({ icon: Icon, label, value, to, color }: { icon: any; label: string; value: string | number; to: string; color: string }) => (
+const StatCard = ({ icon: Icon, label, value, to, color, loading }: { icon: any; label: string; value: string | number; to: string; color: string; loading?: boolean }) => (
   <Link to={to}>
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="flex items-center gap-3 p-4">
@@ -15,7 +14,7 @@ const StatCard = ({ icon: Icon, label, value, to, color }: { icon: any; label: s
           <Icon className="h-5 w-5" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-2xl font-bold text-foreground">{value}</p>
+          <p className="text-2xl font-bold text-foreground">{loading ? "–" : value}</p>
           <p className="text-xs text-muted-foreground">{label}</p>
         </div>
         <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -35,22 +34,80 @@ const formatTime = (t: string) => {
 
 const DashboardPage = () => {
   const { user, isAdmin } = useAuth();
+  const today = new Date().toISOString().split("T")[0];
 
-  const { data: staffCount = 0 } = useQuery({
-    queryKey: ["staff-count"],
+  const { data: staffCount = 0, isLoading: loadingStaff } = useQuery({
+    queryKey: ["dashboard-staff-count"],
     queryFn: async () => {
-      const { count } = await supabase.from("profiles").select("*", { count: "exact", head: true });
+      const { count } = await supabase.from("profiles").select("*", { count: "exact", head: true }).eq("active", true);
       return count || 0;
     },
-    enabled: isAdmin,
+    enabled: isAdmin && !!user,
+  });
+
+  const { data: shiftsToday = 0, isLoading: loadingShifts } = useQuery({
+    queryKey: ["dashboard-shifts-today", today],
+    queryFn: async () => {
+      const { count } = await supabase.from("shifts").select("*", { count: "exact", head: true }).eq("date", today);
+      return count || 0;
+    },
+    enabled: isAdmin && !!user,
+  });
+
+  const { data: pendingLeave = 0, isLoading: loadingLeave } = useQuery({
+    queryKey: ["dashboard-pending-leave"],
+    queryFn: async () => {
+      const { count } = await supabase.from("unavailability").select("*", { count: "exact", head: true }).eq("status", "pending");
+      return count || 0;
+    },
+    enabled: isAdmin && !!user,
+  });
+
+  const { data: messageCount = 0, isLoading: loadingMsgCount } = useQuery({
+    queryKey: ["dashboard-message-count"],
+    queryFn: async () => {
+      const { count } = await supabase.from("messages").select("*", { count: "exact", head: true });
+      return count || 0;
+    },
+    enabled: !!user,
+  });
+
+  const { data: recentMessages = [] } = useQuery({
+    queryKey: ["dashboard-recent-messages"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("messages").select("*").order("created_at", { ascending: false }).limit(3);
+      if (error) throw error;
+      const authorIds = [...new Set(data.map((m) => m.author_id))];
+      const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").in("user_id", authorIds);
+      const nameMap = Object.fromEntries((profiles || []).map((p) => [p.user_id, p.full_name]));
+      return data.map((m) => ({ ...m, authorName: nameMap[m.author_id] || "Unknown" }));
+    },
+    enabled: isAdmin && !!user,
+  });
+
+  // Staff-specific queries
+  const { data: myShifts = [] } = useQuery({
+    queryKey: ["dashboard-my-shifts", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("shifts").select("*").eq("staff_id", user!.id).gte("date", today).order("date", { ascending: true }).order("start_time", { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !isAdmin && !!user,
+  });
+
+  const { data: myShiftCount = 0, isLoading: loadingMyShifts } = useQuery({
+    queryKey: ["dashboard-my-shift-count", user?.id],
+    queryFn: async () => {
+      const { count } = await supabase.from("shifts").select("*", { count: "exact", head: true }).eq("staff_id", user!.id);
+      return count || 0;
+    },
+    enabled: !isAdmin && !!user,
   });
 
   if (!user) return null;
 
-  const today = new Date().toISOString().split("T")[0];
-
   if (isAdmin) {
-    const pendingLeave = mockUnavailability.filter((u) => u.status === "pending").length;
     return (
       <div className="p-4 space-y-4">
         <div>
@@ -58,17 +115,19 @@ const DashboardPage = () => {
           <p className="text-sm text-muted-foreground">Admin Dashboard</p>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <StatCard icon={Users} label="Staff Members" value={staffCount} to="/staff" color="bg-primary/10 text-primary" />
-          <StatCard icon={CalendarDays} label="Shifts Today" value={mockShifts.filter((s) => s.date === today).length} to="/roster" color="bg-secondary/10 text-secondary" />
-          <StatCard icon={CalendarOff} label="Pending Leave" value={pendingLeave} to="/unavailability" color="bg-warning/10 text-warning" />
-          <StatCard icon={MessageSquare} label="Messages" value={mockMessages.length} to="/messages" color="bg-success/10 text-success" />
+          <StatCard icon={Users} label="Staff Members" value={staffCount} to="/staff" color="bg-primary/10 text-primary" loading={loadingStaff} />
+          <StatCard icon={CalendarDays} label="Shifts Today" value={shiftsToday} to="/roster" color="bg-secondary/10 text-secondary" loading={loadingShifts} />
+          <StatCard icon={CalendarOff} label="Pending Leave" value={pendingLeave} to="/unavailability" color="bg-warning/10 text-warning" loading={loadingLeave} />
+          <StatCard icon={MessageSquare} label="Messages" value={messageCount} to="/messages" color="bg-success/10 text-success" loading={loadingMsgCount} />
         </div>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold text-muted-foreground">Recent Messages</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {mockMessages.slice(0, 3).map((m) => (
+            {recentMessages.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-2">No messages yet</p>
+            ) : recentMessages.map((m: any) => (
               <div key={m.id} className="flex gap-2">
                 <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
                   {m.authorName.charAt(0)}
@@ -86,8 +145,7 @@ const DashboardPage = () => {
   }
 
   // Staff dashboard
-  const myShifts = mockShifts.filter((s) => s.staffId === user.id).sort((a, b) => a.date.localeCompare(b.date));
-  const nextShift = myShifts.find((s) => s.date >= today);
+  const nextShift = myShifts[0];
 
   return (
     <div className="p-4 space-y-4">
@@ -102,7 +160,7 @@ const DashboardPage = () => {
             <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Next Shift</p>
             <p className="text-lg font-bold text-foreground">{formatShiftDate(nextShift.date)}</p>
             <p className="text-sm text-muted-foreground">
-              {formatTime(nextShift.startTime)} – {formatTime(nextShift.endTime)}
+              {formatTime(nextShift.start_time)} – {formatTime(nextShift.end_time)}
             </p>
             <p className="text-sm text-muted-foreground">{nextShift.area}</p>
           </CardContent>
@@ -116,8 +174,8 @@ const DashboardPage = () => {
       )}
 
       <div className="grid grid-cols-2 gap-3">
-        <StatCard icon={CalendarDays} label="My Shifts" value={myShifts.length} to="/roster" color="bg-primary/10 text-primary" />
-        <StatCard icon={MessageSquare} label="Messages" value={mockMessages.length} to="/messages" color="bg-secondary/10 text-secondary" />
+        <StatCard icon={CalendarDays} label="My Shifts" value={myShiftCount} to="/roster" color="bg-primary/10 text-primary" loading={loadingMyShifts} />
+        <StatCard icon={MessageSquare} label="Messages" value={messageCount} to="/messages" color="bg-secondary/10 text-secondary" loading={loadingMsgCount} />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
