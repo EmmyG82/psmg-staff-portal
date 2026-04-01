@@ -56,9 +56,7 @@ export const mockUnavailability: UnavailabilityRequest[] = [
 ];
 
 export const mockMessages: Message[] = [
-  { id: "m1", authorId: "1", authorName: "Corey Mitchell", authorRole: "admin", content: "Reminder: New linen supplier starts Monday. Please check the laundry room for updated instructions.", timestamp: "2026-03-27T08:00:00Z", pinned: true, isAnnouncement: true },
   { id: "m2", authorId: "3", authorName: "Maria Lopez", authorRole: "staff", content: "Room 7 needs a new mattress protector — the current one has a tear.", timestamp: "2026-03-26T15:30:00Z", pinned: false, isAnnouncement: false },
-  { id: "m3", authorId: "1", authorName: "Corey Mitchell", authorRole: "admin", content: "Great work last week team! Occupancy was at 95% and guest feedback was excellent.", timestamp: "2026-03-25T09:00:00Z", pinned: false, isAnnouncement: true },
   { id: "m4", authorId: "4", authorName: "James Chen", authorRole: "staff", content: "Can we get more vacuum bags? Running low.", timestamp: "2026-03-25T11:00:00Z", pinned: false, isAnnouncement: false },
 ];
 
