@@ -82,18 +82,11 @@ const DashboardPage = () => {
   const { data: myShifts = [] } = useQuery({
     queryKey: ["dashboard-my-shifts", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("shifts").select("*").eq("staff_id", user!.id).gte("date", today).order("date", { ascending: true }).order("start_time", { ascending: true });
+      const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+      const weekEnd = addDays(weekStart, 6);
+      const { data, error } = await supabase.from("shifts").select("*").eq("staff_id", user!.id).gte("date", format(weekStart, "yyyy-MM-dd")).lte("date", format(weekEnd, "yyyy-MM-dd")).order("date", { ascending: true }).order("start_time", { ascending: true });
       if (error) throw error;
       return data;
-    },
-    enabled: !isAdmin && !!user,
-  });
-
-  const { data: myShiftCount = 0, isLoading: loadingMyShifts } = useQuery({
-    queryKey: ["dashboard-my-shift-count", user?.id],
-    queryFn: async () => {
-      const { count } = await supabase.from("shifts").select("*", { count: "exact", head: true }).eq("staff_id", user!.id);
-      return count || 0;
     },
     enabled: !isAdmin && !!user,
   });
