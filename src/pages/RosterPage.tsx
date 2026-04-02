@@ -180,15 +180,11 @@ const RosterPage = () => {
                   <Label htmlFor="date">Date</Label>
                   <Input name="date" type="date" defaultValue={editingShift?.date ?? format(new Date(), "yyyy-MM-dd")} required />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="start_time">Start</Label>
-                    <Input name="start_time" type="time" defaultValue={editingShift?.start_time?.slice(0, 5) ?? "09:00"} required />
-                  </div>
-                  <div>
-                    <Label htmlFor="end_time">End</Label>
-                    <Input name="end_time" type="time" defaultValue={editingShift?.end_time?.slice(0, 5) ?? "14:00"} required />
-                  </div>
+                <input type="hidden" name="start_time" value="10:00" />
+                <input type="hidden" name="end_time" value="23:59" />
+                <div>
+                  <Label>Shift Time</Label>
+                  <p className="text-sm text-muted-foreground mt-1">10:00am – Until Required</p>
                 </div>
                 <div>
                   <Label htmlFor="area">Area</Label>
