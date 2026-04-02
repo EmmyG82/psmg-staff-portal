@@ -1,8 +1,8 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarDays, MessageSquare, Users, CalendarOff, ChevronRight, Loader2 } from "lucide-react";
+import { CalendarDays, MessageSquare, Users, CalendarOff, ChevronRight, Loader2, Clock, MapPin } from "lucide-react";
 import { Link } from "react-router-dom";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, startOfWeek, addDays, isSameDay } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
