@@ -1,8 +1,8 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarDays, MessageSquare, Users, CalendarOff, ChevronRight, Loader2 } from "lucide-react";
+import { CalendarDays, MessageSquare, Users, CalendarOff, ChevronRight, Loader2, Clock, MapPin } from "lucide-react";
 import { Link } from "react-router-dom";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, startOfWeek, addDays, isSameDay } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -24,13 +24,6 @@ const StatCard = ({ icon: Icon, label, value, to, color, loading }: { icon: any;
 );
 
 const formatShiftDate = (dateStr: string) => format(parseISO(dateStr), "EEE d MMM");
-const formatTime = (t: string) => {
-  const [h, m] = t.split(":");
-  const hour = parseInt(h);
-  const ampm = hour >= 12 ? "pm" : "am";
-  const display = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-  return `${display}:${m}${ampm}`;
-};
 
 const DashboardPage = () => {
   const { user, isAdmin } = useAuth();
@@ -89,18 +82,11 @@ const DashboardPage = () => {
   const { data: myShifts = [] } = useQuery({
     queryKey: ["dashboard-my-shifts", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("shifts").select("*").eq("staff_id", user!.id).gte("date", today).order("date", { ascending: true }).order("start_time", { ascending: true });
+      const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+      const weekEnd = addDays(weekStart, 6);
+      const { data, error } = await supabase.from("shifts").select("*").eq("staff_id", user!.id).gte("date", format(weekStart, "yyyy-MM-dd")).lte("date", format(weekEnd, "yyyy-MM-dd")).order("date", { ascending: true }).order("start_time", { ascending: true });
       if (error) throw error;
       return data;
-    },
-    enabled: !isAdmin && !!user,
-  });
-
-  const { data: myShiftCount = 0, isLoading: loadingMyShifts } = useQuery({
-    queryKey: ["dashboard-my-shift-count", user?.id],
-    queryFn: async () => {
-      const { count } = await supabase.from("shifts").select("*", { count: "exact", head: true }).eq("staff_id", user!.id);
-      return count || 0;
     },
     enabled: !isAdmin && !!user,
   });
@@ -145,37 +131,59 @@ const DashboardPage = () => {
   }
 
   // Staff dashboard
-  const nextShift = myShifts[0];
+  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   return (
     <div className="p-4 space-y-4">
       <div>
         <h1 className="text-xl font-bold text-foreground">Hey, {user.name.split(" ")[0]} 👋</h1>
-        <p className="text-sm text-muted-foreground">Here's what's coming up</p>
+        <p className="text-sm text-muted-foreground">Your weekly roster</p>
       </div>
 
-      {nextShift ? (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="p-4">
-            <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Next Shift</p>
-            <p className="text-lg font-bold text-foreground">{formatShiftDate(nextShift.date)}</p>
-            <p className="text-sm text-muted-foreground">
-              {formatTime(nextShift.start_time)} – {formatTime(nextShift.end_time)}
-            </p>
-            <p className="text-sm text-muted-foreground">{nextShift.area}</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="p-4 text-center text-muted-foreground text-sm">
-            No upcoming shifts scheduled.
-          </CardContent>
-        </Card>
-      )}
+      <div className="space-y-3">
+        {weekDays.map((day) => {
+          const dayShifts = myShifts.filter((s) => isSameDay(parseISO(s.date), day));
+          const isToday = isSameDay(day, new Date());
 
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard icon={CalendarDays} label="My Shifts" value={myShiftCount} to="/roster" color="bg-primary/10 text-primary" loading={loadingMyShifts} />
-        <StatCard icon={MessageSquare} label="Messages" value={messageCount} to="/messages" color="bg-secondary/10 text-secondary" loading={loadingMsgCount} />
+          return (
+            <div key={day.toISOString()}>
+              <p className={`text-xs font-semibold uppercase tracking-wider mb-1.5 ${isToday ? "text-primary" : "text-muted-foreground"}`}>
+                {format(day, "EEEE d MMM")}
+                {isToday && <span className="ml-1.5 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">Today</span>}
+              </p>
+              {dayShifts.length === 0 ? (
+                <Card className="border-dashed">
+                  <CardContent className="p-3 text-center text-sm text-muted-foreground">
+                    No shifts
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-2">
+                  {dayShifts.map((shift) => (
+                    <Card key={shift.id} className={isToday ? "border-primary/30 bg-primary/5" : ""}>
+                      <CardContent className="p-3">
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5" />
+                            10:00am – Until Required
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3.5 w-3.5" />
+                            {shift.area}
+                          </span>
+                        </div>
+                        {shift.notes && (
+                          <p className="text-xs text-muted-foreground mt-1">{shift.notes}</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -187,13 +195,11 @@ const DashboardPage = () => {
             </CardContent>
           </Card>
         </Link>
-        <Link to="/files">
+        <Link to="/messages">
           <Card className="hover:shadow-md transition-shadow">
             <CardContent className="p-4 text-center">
-              <svg className="h-6 w-6 mx-auto mb-1 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-              <p className="text-xs font-medium text-muted-foreground">My Files</p>
+              <MessageSquare className="h-6 w-6 mx-auto mb-1 text-muted-foreground" />
+              <p className="text-xs font-medium text-muted-foreground">Messages</p>
             </CardContent>
           </Card>
         </Link>

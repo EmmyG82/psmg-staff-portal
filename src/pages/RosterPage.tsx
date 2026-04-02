@@ -13,13 +13,8 @@ import { ChevronLeft, ChevronRight, MapPin, Clock, Plus, MoreVertical, Pencil, T
 import { format, addDays, startOfWeek, isSameDay, parseISO } from "date-fns";
 import { toast } from "sonner";
 
-const formatTime = (t: string) => {
-  const [h, m] = t.split(":");
-  const hour = parseInt(h);
-  const ampm = hour >= 12 ? "pm" : "am";
-  const display = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-  return `${display}:${m}${ampm}`;
-};
+const formatStartTime = () => "10:00am";
+const formatEndTime = () => "Until Required";
 
 interface ShiftRow {
   id: string;
@@ -185,15 +180,11 @@ const RosterPage = () => {
                   <Label htmlFor="date">Date</Label>
                   <Input name="date" type="date" defaultValue={editingShift?.date ?? format(new Date(), "yyyy-MM-dd")} required />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="start_time">Start</Label>
-                    <Input name="start_time" type="time" defaultValue={editingShift?.start_time?.slice(0, 5) ?? "09:00"} required />
-                  </div>
-                  <div>
-                    <Label htmlFor="end_time">End</Label>
-                    <Input name="end_time" type="time" defaultValue={editingShift?.end_time?.slice(0, 5) ?? "14:00"} required />
-                  </div>
+                <input type="hidden" name="start_time" value="10:00" />
+                <input type="hidden" name="end_time" value="23:59" />
+                <div>
+                  <Label>Shift Time</Label>
+                  <p className="text-sm text-muted-foreground mt-1">10:00am – Until Required</p>
                 </div>
                 <div>
                   <Label htmlFor="area">Area</Label>
@@ -259,7 +250,7 @@ const RosterPage = () => {
                               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                 <span className="flex items-center gap-1">
                                   <Clock className="h-3.5 w-3.5" />
-                                  {formatTime(shift.start_time)} – {formatTime(shift.end_time)}
+                                  {formatStartTime()} – {formatEndTime()}
                                 </span>
                                 <span className="flex items-center gap-1">
                                   <MapPin className="h-3.5 w-3.5" />
