@@ -110,6 +110,7 @@ export type Database = {
           end_time: string
           id: string
           notes: string | null
+          published: boolean
           staff_id: string
           start_time: string
           updated_at: string
@@ -122,6 +123,7 @@ export type Database = {
           end_time: string
           id?: string
           notes?: string | null
+          published?: boolean
           staff_id: string
           start_time: string
           updated_at?: string
@@ -134,6 +136,7 @@ export type Database = {
           end_time?: string
           id?: string
           notes?: string | null
+          published?: boolean
           staff_id?: string
           start_time?: string
           updated_at?: string
