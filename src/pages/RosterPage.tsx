@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -9,12 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ChevronLeft, ChevronRight, MapPin, Clock, Plus, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Clock, Plus, MoreVertical, Pencil, Trash2, Send } from "lucide-react";
 import { format, addDays, startOfWeek, isSameDay, parseISO } from "date-fns";
 import { toast } from "sonner";
-
-const formatStartTime = () => "10:00am";
-const formatEndTime = () => "Until Required";
 
 interface ShiftRow {
   id: string;
@@ -24,7 +21,7 @@ interface ShiftRow {
   end_time: string;
   area: string;
   notes: string | null;
-  profiles: { full_name: string } | null;
+  published: boolean;
 }
 
 const RosterPage = () => {
@@ -43,7 +40,7 @@ const RosterPage = () => {
     queryFn: async () => {
       let query = supabase
         .from("shifts")
-        .select("id, staff_id, date, start_time, end_time, area, notes, profiles(full_name)")
+        .select("id, staff_id, date, start_time, end_time, area, notes, published")
         .gte("date", format(weekStart, "yyyy-MM-dd"))
         .lte("date", format(weekEnd, "yyyy-MM-dd"))
         .order("date")
@@ -55,10 +52,32 @@ const RosterPage = () => {
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data as unknown as ShiftRow[]) ?? [];
+      return (data ?? []) as ShiftRow[];
     },
     enabled: !!user,
   });
+
+  // Fetch staff profiles to map staff_id -> full_name
+  const staffIds = useMemo(() => [...new Set(shifts.map((s) => s.staff_id))], [shifts]);
+  const { data: staffProfiles = [] } = useQuery({
+    queryKey: ["staff-profiles", staffIds],
+    queryFn: async () => {
+      if (staffIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("user_id, full_name")
+        .in("user_id", staffIds);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: staffIds.length > 0,
+  });
+
+  const staffNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    staffProfiles.forEach((p) => { map[p.user_id] = p.full_name; });
+    return map;
+  }, [staffProfiles]);
 
   // Fetch staff list for admin shift creation
   const { data: staffList = [] } = useQuery({
@@ -74,6 +93,9 @@ const RosterPage = () => {
     },
     enabled: isAdmin,
   });
+
+  // Check if current week has unpublished shifts
+  const hasUnpublished = isAdmin && shifts.some((s) => !s.published);
 
   const saveMutation = useMutation({
     mutationFn: async (form: { id?: string; staff_id: string; date: string; start_time: string; end_time: string; area: string; notes: string }) => {
@@ -121,6 +143,23 @@ const RosterPage = () => {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const publishMutation = useMutation({
+    mutationFn: async () => {
+      const unpublishedIds = shifts.filter((s) => !s.published).map((s) => s.id);
+      if (unpublishedIds.length === 0) return;
+      const { error } = await supabase
+        .from("shifts")
+        .update({ published: true })
+        .in("id", unpublishedIds);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shifts"] });
+      toast.success("Roster published to staff");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   if (!user) return null;
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -149,57 +188,71 @@ const RosterPage = () => {
 
   return (
     <div className="p-4 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <h1 className="text-xl font-bold text-foreground">
           {isAdmin ? "Full Roster" : "My Roster"}
         </h1>
         {isAdmin && (
-          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingShift(null); }}>
-            <DialogTrigger asChild>
-              <Button size="sm" onClick={openCreate}>
-                <Plus className="h-4 w-4 mr-1" /> Add Shift
+          <div className="flex items-center gap-2">
+            {hasUnpublished && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => publishMutation.mutate()}
+                disabled={publishMutation.isPending}
+                className="text-primary border-primary"
+              >
+                <Send className="h-4 w-4 mr-1" />
+                {publishMutation.isPending ? "Publishing..." : "Publish Roster"}
               </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingShift ? "Edit Shift" : "Add Shift"}</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="staff_id">Staff Member</Label>
-                  <Select name="staff_id" defaultValue={editingShift?.staff_id ?? ""} required>
-                    <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
-                    <SelectContent>
-                      {staffList.map((s) => (
-                        <SelectItem key={s.user_id} value={s.user_id}>{s.full_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="date">Date</Label>
-                  <Input name="date" type="date" defaultValue={editingShift?.date ?? format(new Date(), "yyyy-MM-dd")} required />
-                </div>
-                <input type="hidden" name="start_time" value="10:00" />
-                <input type="hidden" name="end_time" value="23:59" />
-                <div>
-                  <Label>Shift Time</Label>
-                  <p className="text-sm text-muted-foreground mt-1">10:00am – Until Required</p>
-                </div>
-                <div>
-                  <Label htmlFor="area">Area</Label>
-                  <Input name="area" defaultValue={editingShift?.area ?? ""} placeholder="e.g. Rooms 1–10" required />
-                </div>
-                <div>
-                  <Label htmlFor="notes">Notes (optional)</Label>
-                  <Input name="notes" defaultValue={editingShift?.notes ?? ""} placeholder="Any notes" />
-                </div>
-                <Button type="submit" className="w-full" disabled={saveMutation.isPending}>
-                  {saveMutation.isPending ? "Saving..." : editingShift ? "Update Shift" : "Create Shift"}
+            )}
+            <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingShift(null); }}>
+              <DialogTrigger asChild>
+                <Button size="sm" onClick={openCreate}>
+                  <Plus className="h-4 w-4 mr-1" /> Add Shift
                 </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{editingShift ? "Edit Shift" : "Add Shift"}</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="staff_id">Staff Member</Label>
+                    <Select name="staff_id" defaultValue={editingShift?.staff_id ?? ""} required>
+                      <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
+                      <SelectContent>
+                        {staffList.map((s) => (
+                          <SelectItem key={s.user_id} value={s.user_id}>{s.full_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="date">Date</Label>
+                    <Input name="date" type="date" defaultValue={editingShift?.date ?? format(new Date(), "yyyy-MM-dd")} required />
+                  </div>
+                  <input type="hidden" name="start_time" value="10:00" />
+                  <input type="hidden" name="end_time" value="23:59" />
+                  <div>
+                    <Label>Shift Time</Label>
+                    <p className="text-sm text-muted-foreground mt-1">10:00am – Until Required</p>
+                  </div>
+                  <div>
+                    <Label htmlFor="area">Area</Label>
+                    <Input name="area" defaultValue={editingShift?.area ?? ""} placeholder="e.g. Rooms 1–10" required />
+                  </div>
+                  <div>
+                    <Label htmlFor="notes">Notes (optional)</Label>
+                    <Input name="notes" defaultValue={editingShift?.notes ?? ""} placeholder="Any notes" />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={saveMutation.isPending}>
+                    {saveMutation.isPending ? "Saving..." : editingShift ? "Update Shift" : "Create Shift"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         )}
       </div>
 
@@ -238,19 +291,24 @@ const RosterPage = () => {
                 ) : (
                   <div className="space-y-2">
                     {dayShifts.map((shift) => (
-                      <Card key={shift.id} className={isToday ? "border-primary/30 bg-primary/5" : ""}>
+                      <Card key={shift.id} className={`${isToday ? "border-primary/30 bg-primary/5" : ""} ${isAdmin && !shift.published ? "border-dashed border-muted-foreground/40" : ""}`}>
                         <CardContent className="p-3">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               {isAdmin && (
-                                <p className="text-sm font-semibold text-foreground mb-1">
-                                  {shift.profiles?.full_name ?? "Unknown"}
-                                </p>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className="text-sm font-semibold text-foreground">
+                                    {staffNameMap[shift.staff_id] ?? "Unknown"}
+                                  </p>
+                                  {!shift.published && (
+                                    <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">Draft</span>
+                                  )}
+                                </div>
                               )}
                               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                 <span className="flex items-center gap-1">
                                   <Clock className="h-3.5 w-3.5" />
-                                  {formatStartTime()} – {formatEndTime()}
+                                  10:00am – Until Required
                                 </span>
                                 <span className="flex items-center gap-1">
                                   <MapPin className="h-3.5 w-3.5" />
