@@ -13,13 +13,8 @@ import { ChevronLeft, ChevronRight, MapPin, Clock, Plus, MoreVertical, Pencil, T
 import { format, addDays, startOfWeek, isSameDay, parseISO } from "date-fns";
 import { toast } from "sonner";
 
-const formatTime = (t: string) => {
-  const [h, m] = t.split(":");
-  const hour = parseInt(h);
-  const ampm = hour >= 12 ? "pm" : "am";
-  const display = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-  return `${display}:${m}${ampm}`;
-};
+const formatStartTime = () => "10:00am";
+const formatEndTime = () => "Until Required";
 
 interface ShiftRow {
   id: string;
