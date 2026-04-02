@@ -24,13 +24,6 @@ const StatCard = ({ icon: Icon, label, value, to, color, loading }: { icon: any;
 );
 
 const formatShiftDate = (dateStr: string) => format(parseISO(dateStr), "EEE d MMM");
-const formatTime = (t: string) => {
-  const [h, m] = t.split(":");
-  const hour = parseInt(h);
-  const ampm = hour >= 12 ? "pm" : "am";
-  const display = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-  return `${display}:${m}${ampm}`;
-};
 
 const DashboardPage = () => {
   const { user, isAdmin } = useAuth();
