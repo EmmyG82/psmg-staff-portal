@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,8 @@ import { toast } from "@/hooks/use-toast";
 import { Loader2, User, Phone, Mail, Lock } from "lucide-react";
 
 const ProfilePage = () => {
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [fullName, setFullName] = useState(user?.name || "");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState(user?.email || "");
@@ -61,11 +63,17 @@ const ProfilePage = () => {
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Confirmation email sent", description: "Check your inbox to confirm the new email address." });
+      toast({ title: "Confirmation email sent", description: "Check your inbox to confirm the new email address and then re-login." });
+      await logout();
+      navigate("/login");
     }
   };
 
   const handleChangePassword = async () => {
+    if (!currentPassword.trim()) {
+      toast({ title: "Error", description: "Current password is required", variant: "destructive" });
+      return;
+    }
     if (newPassword.length < 6) {
       toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
       return;
@@ -75,15 +83,31 @@ const ProfilePage = () => {
       return;
     }
     setSavingPassword(true);
+
+    // First re-authenticate with current password
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: user?.email || "",
+      password: currentPassword,
+    });
+
+    if (authError) {
+      setSavingPassword(false);
+      toast({ title: "Error", description: "Current password is incorrect", variant: "destructive" });
+      return;
+    }
+
+    // Then update to new password
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     setSavingPassword(false);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Password updated" });
+      toast({ title: "Password updated. Please log in with your new credentials." });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      await logout();
+      navigate("/login");
     }
   };
 
@@ -137,6 +161,10 @@ const ProfilePage = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="currentPassword">Current Password</Label>
+            <Input id="currentPassword" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+          </div>
           <div className="space-y-2">
             <Label htmlFor="newPassword">New Password</Label>
             <Input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min 6 characters" />

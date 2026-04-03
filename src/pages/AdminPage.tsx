@@ -1,14 +1,13 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
-import { Users, CalendarDays, MessageSquare, FileText, CalendarOff, Shield, ChevronRight } from "lucide-react";
+import { Users, CalendarDays, MessageSquare, CalendarOff, Shield, ChevronRight } from "lucide-react";
 
 const adminLinks = [
   { to: "/staff", icon: Users, label: "Staff Management", desc: "Add, deactivate, manage roles" },
   { to: "/roster", icon: CalendarDays, label: "Roster", desc: "Create and manage shifts" },
   { to: "/unavailability", icon: CalendarOff, label: "Leave Requests", desc: "View and approve requests" },
   { to: "/messages", icon: MessageSquare, label: "Messages", desc: "Post announcements, manage messages" },
-  { to: "/files", icon: FileText, label: "Staff Files", desc: "Upload and manage documents" },
 ];
 
 const AdminPage = () => {

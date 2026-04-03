@@ -1,12 +1,12 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarDays, MessageSquare, Users, CalendarOff, ChevronRight, Loader2, Clock, MapPin } from "lucide-react";
+import { CalendarDays, MessageSquare, Users, CalendarOff, ChevronRight, Loader2, Clock, MapPin, LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format, parseISO, startOfWeek, addDays, isSameDay } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-const StatCard = ({ icon: Icon, label, value, to, color, loading }: { icon: any; label: string; value: string | number; to: string; color: string; loading?: boolean }) => (
+const StatCard = ({ icon: Icon, label, value, to, color, loading }: { icon: LucideIcon; label: string; value: string | number; to: string; color: string; loading?: boolean }) => (
   <Link to={to}>
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="flex items-center gap-3 p-4">
@@ -24,6 +24,13 @@ const StatCard = ({ icon: Icon, label, value, to, color, loading }: { icon: any;
 );
 
 const formatShiftDate = (dateStr: string) => format(parseISO(dateStr), "EEE d MMM");
+
+type DashboardMessage = {
+  id: string;
+  author_id: string;
+  authorName: string;
+  content: string;
+};
 
 const DashboardPage = () => {
   const { user, isAdmin } = useAuth();
@@ -65,7 +72,7 @@ const DashboardPage = () => {
     enabled: !!user,
   });
 
-  const { data: recentMessages = [] } = useQuery({
+  const { data: recentMessages = [] } = useQuery<DashboardMessage[]>({
     queryKey: ["dashboard-recent-messages"],
     queryFn: async () => {
       const { data, error } = await supabase.from("messages").select("*").order("created_at", { ascending: false }).limit(3);
@@ -113,7 +120,7 @@ const DashboardPage = () => {
           <CardContent className="space-y-3">
             {recentMessages.length === 0 ? (
               <p className="text-xs text-muted-foreground text-center py-2">No messages yet</p>
-            ) : recentMessages.map((m: any) => (
+            ) : recentMessages.map((m) => (
               <div key={m.id} className="flex gap-2">
                 <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
                   {m.authorName.charAt(0)}

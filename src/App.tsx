@@ -13,7 +13,6 @@ import DashboardPage from "@/pages/DashboardPage";
 import RosterPage from "@/pages/RosterPage";
 import UnavailabilityPage from "@/pages/UnavailabilityPage";
 import MessagesPage from "@/pages/MessagesPage";
-import FilesPage from "@/pages/FilesPage";
 import StaffManagementPage from "@/pages/StaffManagementPage";
 import AdminPage from "@/pages/AdminPage";
 import ProfilePage from "@/pages/ProfilePage";
@@ -39,7 +38,6 @@ const App = () => (
                 <Route path="/roster" element={<RosterPage />} />
                 <Route path="/unavailability" element={<UnavailabilityPage />} />
                 <Route path="/messages" element={<MessagesPage />} />
-                <Route path="/files" element={<FilesPage />} />
                 <Route path="/staff" element={<StaffManagementPage />} />
                 <Route path="/admin" element={<AdminPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
