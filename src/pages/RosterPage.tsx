@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ChevronLeft, ChevronRight, MapPin, Clock, Plus, MoreVertical, Pencil, Trash2, Send } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Plus, MoreVertical, Pencil, Trash2, Send } from "lucide-react";
 import { format, addDays, startOfWeek, isSameDay, parseISO } from "date-fns";
 import { toast } from "sonner";
 
@@ -24,17 +24,24 @@ interface ShiftRow {
   published: boolean;
 }
 
+interface UnavailabilityRow {
+  staff_id: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+}
+
 const RosterPage = () => {
   const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<ShiftRow | null>(null);
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
 
   const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  // Fetch shifts for the visible week
   const { data: shifts = [], isLoading } = useQuery({
     queryKey: ["shifts", weekStart.toISOString()],
     queryFn: async () => {
@@ -57,7 +64,6 @@ const RosterPage = () => {
     enabled: !!user,
   });
 
-  // Fetch staff profiles to map staff_id -> full_name
   const staffIds = useMemo(() => [...new Set(shifts.map((s) => s.staff_id))], [shifts]);
   const { data: staffProfiles = [] } = useQuery({
     queryKey: ["staff-profiles", staffIds],
@@ -79,7 +85,6 @@ const RosterPage = () => {
     return map;
   }, [staffProfiles]);
 
-  // Fetch staff list for admin shift creation
   const { data: staffList = [] } = useQuery({
     queryKey: ["staff-list"],
     queryFn: async () => {
@@ -94,7 +99,34 @@ const RosterPage = () => {
     enabled: isAdmin,
   });
 
-  // Check if current week has unpublished shifts
+  // Fetch unavailability for the visible week
+  const { data: unavailability = [] } = useQuery({
+    queryKey: ["unavailability-week", weekStart.toISOString()],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("unavailability")
+        .select("staff_id, start_date, end_date, status")
+        .in("status", ["pending", "approved"])
+        .lte("start_date", format(weekEnd, "yyyy-MM-dd"))
+        .gte("end_date", format(weekStart, "yyyy-MM-dd"));
+      if (error) throw error;
+      return (data ?? []) as UnavailabilityRow[];
+    },
+    enabled: isAdmin,
+  });
+
+  // Build a set of staff_ids unavailable for the selected date
+  const unavailableStaffForDate = useMemo(() => {
+    const set = new Set<string>();
+    const d = selectedDate;
+    unavailability.forEach((u) => {
+      if (d >= u.start_date && d <= u.end_date) {
+        set.add(u.staff_id);
+      }
+    });
+    return set;
+  }, [unavailability, selectedDate]);
+
   const hasUnpublished = isAdmin && shifts.some((s) => !s.published);
 
   const saveMutation = useMutation({
@@ -169,15 +201,16 @@ const RosterPage = () => {
       id: editingShift?.id,
       staff_id: fd.get("staff_id") as string,
       date: fd.get("date") as string,
-      start_time: fd.get("start_time") as string,
-      end_time: fd.get("end_time") as string,
-      area: fd.get("area") as string,
+      start_time: "10:00",
+      end_time: "23:59",
+      area: "General",
       notes: fd.get("notes") as string,
     });
   };
 
   const openEdit = (shift: ShiftRow) => {
     setEditingShift(shift);
+    setSelectedDate(shift.date);
     setDialogOpen(true);
   };
 
@@ -218,29 +251,39 @@ const RosterPage = () => {
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
+                    <Label htmlFor="date">Date</Label>
+                    <Input
+                      name="date"
+                      type="date"
+                      defaultValue={editingShift?.date ?? format(new Date(), "yyyy-MM-dd")}
+                      required
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                    />
+                  </div>
+                  <div>
                     <Label htmlFor="staff_id">Staff Member</Label>
                     <Select name="staff_id" defaultValue={editingShift?.staff_id ?? ""} required>
                       <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
                       <SelectContent>
-                        {staffList.map((s) => (
-                          <SelectItem key={s.user_id} value={s.user_id}>{s.full_name}</SelectItem>
-                        ))}
+                        {staffList.map((s) => {
+                          const isUnavailable = unavailableStaffForDate.has(s.user_id);
+                          return (
+                            <SelectItem
+                              key={s.user_id}
+                              value={s.user_id}
+                              disabled={isUnavailable}
+                              className={isUnavailable ? "opacity-50" : ""}
+                            >
+                              {s.full_name}{isUnavailable ? " (Unavailable)" : ""}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="date">Date</Label>
-                    <Input name="date" type="date" defaultValue={editingShift?.date ?? format(new Date(), "yyyy-MM-dd")} required />
-                  </div>
-                  <input type="hidden" name="start_time" value="10:00" />
-                  <input type="hidden" name="end_time" value="23:59" />
-                  <div>
                     <Label>Shift Time</Label>
                     <p className="text-sm text-muted-foreground mt-1">10:00am – Until Required</p>
-                  </div>
-                  <div>
-                    <Label htmlFor="area">Area</Label>
-                    <Input name="area" defaultValue={editingShift?.area ?? ""} placeholder="e.g. Rooms 1–10" required />
                   </div>
                   <div>
                     <Label htmlFor="notes">Notes (optional)</Label>
@@ -309,10 +352,6 @@ const RosterPage = () => {
                                 <span className="flex items-center gap-1">
                                   <Clock className="h-3.5 w-3.5" />
                                   10:00am – Until Required
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <MapPin className="h-3.5 w-3.5" />
-                                  {shift.area}
                                 </span>
                               </div>
                               {shift.notes && (
