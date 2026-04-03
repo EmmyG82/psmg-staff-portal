@@ -1,6 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { LogOut } from "lucide-react";
+import { LogOut, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 import NotificationBell from "@/components/NotificationBell";
 
 const AppHeader = () => {
@@ -17,6 +18,16 @@ const AppHeader = () => {
         </div>
         <div className="flex items-center gap-1">
           <NotificationBell />
+          <Button
+            variant="ghost"
+            size="sm"
+            asChild
+            className="text-primary-foreground hover:bg-primary-foreground/10 h-9 gap-1.5"
+          >
+            <Link to="/profile">
+              <UserCircle className="h-4 w-4" />
+            </Link>
+          </Button>
           <Button
             variant="ghost"
             size="sm"
