@@ -131,6 +131,19 @@ const RosterPage = () => {
   const hasUnpublished = isAdmin && shifts.some((s) => !s.published);
   const hasPublished = shifts.some((s) => s.published);
   const publishLabel = hasPublished ? "Republish Roster" : "Publish Roster";
+
+  const statusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await supabase.from("shifts").update({ status, published: false }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shifts"] });
+      toast.success("Shift status updated");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   const saveMutation = useMutation({
     mutationFn: async (form: { id?: string; staff_id: string; date: string; start_time: string; end_time: string; area: string; notes: string }) => {
       if (form.id) {
