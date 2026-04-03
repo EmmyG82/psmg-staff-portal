@@ -22,6 +22,7 @@ interface ShiftRow {
   area: string;
   notes: string | null;
   published: boolean;
+  status: string;
 }
 
 interface UnavailabilityRow {
