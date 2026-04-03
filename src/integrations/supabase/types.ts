@@ -113,6 +113,7 @@ export type Database = {
           published: boolean
           staff_id: string
           start_time: string
+          status: string
           updated_at: string
         }
         Insert: {
@@ -126,6 +127,7 @@ export type Database = {
           published?: boolean
           staff_id: string
           start_time: string
+          status?: string
           updated_at?: string
         }
         Update: {
@@ -139,6 +141,7 @@ export type Database = {
           published?: boolean
           staff_id?: string
           start_time?: string
+          status?: string
           updated_at?: string
         }
         Relationships: []
