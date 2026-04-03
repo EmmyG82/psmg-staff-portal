@@ -139,6 +139,7 @@ const RosterPage = () => {
           end_time: form.end_time,
           area: form.area,
           notes: form.notes || null,
+          published: false,
         }).eq("id", form.id);
         if (error) throw error;
       } else {
