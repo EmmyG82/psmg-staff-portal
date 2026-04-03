@@ -128,7 +128,8 @@ const RosterPage = () => {
   }, [unavailability, selectedDate]);
 
   const hasUnpublished = isAdmin && shifts.some((s) => !s.published);
-
+  const hasPublished = shifts.some((s) => s.published);
+  const publishLabel = hasPublished ? "Republish Roster" : "Publish Roster";
   const saveMutation = useMutation({
     mutationFn: async (form: { id?: string; staff_id: string; date: string; start_time: string; end_time: string; area: string; notes: string }) => {
       if (form.id) {
