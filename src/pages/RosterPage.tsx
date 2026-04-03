@@ -48,7 +48,7 @@ const RosterPage = () => {
     queryFn: async () => {
       let query = supabase
         .from("shifts")
-        .select("id, staff_id, date, start_time, end_time, area, notes, published")
+        .select("id, staff_id, date, start_time, end_time, area, notes, published, status")
         .gte("date", format(weekStart, "yyyy-MM-dd"))
         .lte("date", format(weekEnd, "yyyy-MM-dd"))
         .order("date")
