@@ -251,7 +251,7 @@ const RosterPage = () => {
                 className="text-primary border-primary"
               >
                 <Send className="h-4 w-4 mr-1" />
-                {publishMutation.isPending ? "Publishing..." : "Publish Roster"}
+                {publishMutation.isPending ? "Publishing..." : publishLabel}
               </Button>
             )}
             <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingShift(null); }}>
