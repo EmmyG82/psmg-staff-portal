@@ -22,6 +22,7 @@ interface ShiftRow {
   area: string;
   notes: string | null;
   published: boolean;
+  status: string;
 }
 
 interface UnavailabilityRow {
@@ -47,7 +48,7 @@ const RosterPage = () => {
     queryFn: async () => {
       let query = supabase
         .from("shifts")
-        .select("id, staff_id, date, start_time, end_time, area, notes, published")
+        .select("id, staff_id, date, start_time, end_time, area, notes, published, status")
         .gte("date", format(weekStart, "yyyy-MM-dd"))
         .lte("date", format(weekEnd, "yyyy-MM-dd"))
         .order("date")
@@ -130,6 +131,19 @@ const RosterPage = () => {
   const hasUnpublished = isAdmin && shifts.some((s) => !s.published);
   const hasPublished = shifts.some((s) => s.published);
   const publishLabel = hasPublished ? "Republish Roster" : "Publish Roster";
+
+  const statusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await supabase.from("shifts").update({ status, published: false }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shifts"] });
+      toast.success("Shift status updated");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   const saveMutation = useMutation({
     mutationFn: async (form: { id?: string; staff_id: string; date: string; start_time: string; end_time: string; area: string; notes: string }) => {
       if (form.id) {
@@ -348,52 +362,81 @@ const RosterPage = () => {
                   </Card>
                 ) : (
                   <div className="space-y-2">
-                    {dayShifts.map((shift) => (
-                      <Card key={shift.id} className={`${isToday ? "border-primary/30 bg-primary/5" : ""} ${isAdmin && !shift.published ? "border-dashed border-muted-foreground/40" : ""}`}>
-                        <CardContent className="p-3">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              {isAdmin && (
-                                <div className="flex items-center gap-2 mb-1">
-                                  <p className="text-sm font-semibold text-foreground">
-                                    {staffNameMap[shift.staff_id] ?? "Unknown"}
-                                  </p>
-                                  {!shift.published && (
-                                    <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">Draft</span>
-                                  )}
+                    {dayShifts.map((shift) => {
+                      const statusBg = shift.status === "staff_cancelled"
+                        ? "bg-red-600 text-white border-red-600"
+                        : shift.status === "admin_cancelled"
+                        ? "bg-black text-white border-black"
+                        : "bg-green-600 text-white border-green-600";
+                      const isCancelled = shift.status === "staff_cancelled" || shift.status === "admin_cancelled";
+                      const statusLabel = shift.status === "staff_cancelled"
+                        ? "Staff Cancelled"
+                        : shift.status === "admin_cancelled"
+                        ? "Admin Cancelled"
+                        : "10:00am – Until Required";
+
+                      return (
+                        <Card key={shift.id} className={`${statusBg} ${isAdmin && !shift.published ? "border-dashed opacity-90" : ""}`}>
+                          <CardContent className="p-3">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                {isAdmin && (
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <p className="text-sm font-semibold">
+                                      {staffNameMap[shift.staff_id] ?? "Unknown"}
+                                    </p>
+                                    {!shift.published && (
+                                      <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full">Draft</span>
+                                    )}
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-4 text-sm">
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="h-3.5 w-3.5" />
+                                    {statusLabel}
+                                  </span>
                                 </div>
-                              )}
-                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                <span className="flex items-center gap-1">
-                                  <Clock className="h-3.5 w-3.5" />
-                                  10:00am – Until Required
-                                </span>
+                                {shift.notes && (
+                                  <p className="text-xs mt-1 opacity-80">{shift.notes}</p>
+                                )}
                               </div>
-                              {shift.notes && (
-                                <p className="text-xs text-muted-foreground mt-1">{shift.notes}</p>
+                              {isAdmin && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-inherit hover:bg-white/20">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    {shift.published && shift.status === "scheduled" && (
+                                      <>
+                                        <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "staff_cancelled" })}>
+                                          <span className="h-3 w-3 rounded-full bg-red-600 mr-2" /> Staff Cancelled
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "admin_cancelled" })}>
+                                          <span className="h-3 w-3 rounded-full bg-black mr-2" /> Admin Cancelled
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                    {isCancelled && (
+                                      <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "scheduled" })}>
+                                        <Clock className="h-4 w-4 mr-2" /> Restore Shift
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem onClick={() => openEdit(shift)}>
+                                      <Pencil className="h-4 w-4 mr-2" /> Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(shift.id)}>
+                                      <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               )}
                             </div>
-                            {isAdmin && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => openEdit(shift)}>
-                                    <Pencil className="h-4 w-4 mr-2" /> Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(shift.id)}>
-                                    <Trash2 className="h-4 w-4 mr-2" /> Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
                 )}
               </div>
