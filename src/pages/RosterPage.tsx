@@ -178,17 +178,30 @@ const RosterPage = () => {
 
   const publishMutation = useMutation({
     mutationFn: async () => {
-      const unpublishedIds = shifts.filter((s) => !s.published).map((s) => s.id);
-      if (unpublishedIds.length === 0) return;
+      const unpublished = shifts.filter((s) => !s.published);
+      if (unpublished.length === 0) return;
+      const unpublishedIds = unpublished.map((s) => s.id);
       const { error } = await supabase
         .from("shifts")
         .update({ published: true })
         .in("id", unpublishedIds);
       if (error) throw error;
+
+      // Notify only affected staff
+      const affectedStaffIds = [...new Set(unpublished.map((s) => s.staff_id))];
+      const notifications = affectedStaffIds.map((staffId) => ({
+        user_id: staffId,
+        title: "Roster Updated",
+        message: `Your roster for ${format(weekStart, "d MMM")} – ${format(weekEnd, "d MMM")} has been updated.`,
+        type: "roster",
+      }));
+      if (notifications.length > 0) {
+        await supabase.from("notifications").insert(notifications);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shifts"] });
-      toast.success("Roster published to staff");
+      toast.success("Roster published to affected staff");
     },
     onError: (err: Error) => toast.error(err.message),
   });
