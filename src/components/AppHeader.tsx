@@ -21,6 +21,16 @@ const AppHeader = () => {
           <Button
             variant="ghost"
             size="sm"
+            asChild
+            className="text-primary-foreground hover:bg-primary-foreground/10 h-9 gap-1.5"
+          >
+            <Link to="/profile">
+              <UserCircle className="h-4 w-4" />
+            </Link>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={logout}
             className="text-primary-foreground hover:bg-primary-foreground/10 h-9 gap-1.5"
           >
