@@ -1,6 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { LogOut } from "lucide-react";
+import { LogOut, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 import NotificationBell from "@/components/NotificationBell";
 
 const AppHeader = () => {
