@@ -102,10 +102,13 @@ const ProfilePage = () => {
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Password updated. Please log in with your new credentials." });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      toast({
+        title: "Password changed successfully",
+        description: "Please log in with your new password.",
+      });
       await logout();
       navigate("/login");
     }

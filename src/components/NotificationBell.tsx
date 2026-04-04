@@ -8,6 +8,7 @@ import { formatDistanceToNow } from "date-fns";
 const typeIcon = (type: Notification["type"]) => {
   switch (type) {
     case "shift": return <CalendarDays className="h-4 w-4 text-primary" />;
+    case "roster": return <CalendarDays className="h-4 w-4 text-primary" />;
     case "message": return <MessageSquare className="h-4 w-4 text-primary" />;
     case "success": return <CheckCircle className="h-4 w-4 text-success" />;
     case "warning": return <AlertTriangle className="h-4 w-4 text-warning" />;

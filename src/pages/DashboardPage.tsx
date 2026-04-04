@@ -194,22 +194,6 @@ const DashboardPage = () => {
       </div>
 
       {/* Duplicate CTA grid removed; bottom nav already provides Leave and Messages access */}
-        <Link to="/unavailability">
-          <Card className="hover:shadow-md transition-shadow">
-            <CardContent className="p-4 text-center">
-              <CalendarOff className="h-6 w-6 mx-auto mb-1 text-muted-foreground" />
-              <p className="text-xs font-medium text-muted-foreground">Submit Leave</p>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link to="/messages">
-          <Card className="hover:shadow-md transition-shadow">
-            <CardContent className="p-4 text-center">
-              <MessageSquare className="h-6 w-6 mx-auto mb-1 text-muted-foreground" />
-              <p className="text-xs font-medium text-muted-foreground">Messages</p>
-            </CardContent>
-          </Card>
-        </Link>
     </div>
   );
 };

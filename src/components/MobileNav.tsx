@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { CalendarDays, MessageSquare, Home, CalendarOff, Users, Settings } from "lucide-react";
+import { CalendarDays, MessageSquare, Home, CalendarOff, Users, Settings, Triangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const MobileNav = () => {
@@ -19,7 +19,8 @@ const MobileNav = () => {
     { to: "/roster", icon: CalendarDays, label: "Roster" },
     { to: "/messages", icon: MessageSquare, label: "Messages" },
     { to: "/staff", icon: Users, label: "Staff" },
-    { to: "/admin", icon: Settings, label: "Admin" },
+    { to: "/admin", icon: Triangle, label: "Admin" },
+    { to: "/profile", icon: Settings, label: "Profile" },
   ];
 
   const links = isAdmin ? adminLinks : staffLinks;

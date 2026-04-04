@@ -5,12 +5,51 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  console.error(
+    "Missing Supabase environment variables. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in .env"
+  );
+}
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+const safeUrl = SUPABASE_URL || "http://localhost:54321";
+const safePublishableKey = SUPABASE_PUBLISHABLE_KEY || "missing-key";
+
+const safeLocalStorage = {
+  getItem: (key: string) => {
+    try {
+      const value = localStorage.getItem(key);
+      if (!value) return null;
+
+      // Supabase stores auth session as JSON; return null for malformed values.
+      if (key.startsWith("sb-") && key.includes("-auth-token")) {
+        JSON.parse(value);
+      }
+
+      return value;
+    } catch (error) {
+      console.error("Invalid local auth storage entry removed", error);
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        // Ignore storage cleanup errors.
+      }
+      return null;
+    }
+  },
+  setItem: (key: string, value: string) => {
+    localStorage.setItem(key, value);
+  },
+  removeItem: (key: string) => {
+    localStorage.removeItem(key);
+  },
+};
+
+export const supabase = createClient<Database>(safeUrl, safePublishableKey, {
   auth: {
-    storage: localStorage,
+    storage: safeLocalStorage,
     persistSession: true,
     autoRefreshToken: true,
   }

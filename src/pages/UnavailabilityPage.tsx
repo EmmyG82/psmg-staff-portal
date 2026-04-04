@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Calendar, Loader2 } from "lucide-react";
-import { format, parseISO, startOfWeek, addDays } from "date-fns";
+import { Plus, Calendar, Loader2, Info } from "lucide-react";
+import { format, parseISO, startOfWeek, addDays, setHours, setMinutes } from "date-fns";
 import { toast } from "sonner";
 
 type UnavailabilityRequest = {
@@ -37,6 +37,25 @@ const UnavailabilityPage = () => {
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 6);
+
+  const isFollowingWeekLocked = () => {
+    const now = new Date();
+    const thisWeekStart = startOfWeek(now, { weekStartsOn: 1 });
+    const thisWeekFriday = addDays(thisWeekStart, 4);
+    const cutoff = setMinutes(setHours(thisWeekFriday, 18), 0);
+    return now >= cutoff;
+  };
+
+  const overlapsFollowingWeek = (startDateValue: string, endDateValue: string) => {
+    const now = new Date();
+    const thisWeekStart = startOfWeek(now, { weekStartsOn: 1 });
+    const nextWeekStart = addDays(thisWeekStart, 7);
+    const nextWeekEnd = addDays(nextWeekStart, 6);
+
+    const start = parseISO(startDateValue);
+    const end = parseISO(endDateValue);
+    return start <= nextWeekEnd && end >= nextWeekStart;
+  };
 
   const { data: rosterDraft = false } = useQuery<boolean>({
     queryKey: ["roster-draft", weekStart.toISOString()],
@@ -84,6 +103,14 @@ const UnavailabilityPage = () => {
 
   const saveMutation = useMutation({
     mutationFn: async (form: { id?: string; start_date: string; end_date: string }) => {
+      if (form.end_date < form.start_date) {
+        throw new Error("End date must be on or after the start date.");
+      }
+
+      if (!isAdmin && isFollowingWeekLocked() && overlapsFollowingWeek(form.start_date, form.end_date)) {
+        throw new Error("Unavailability for next week closes on Friday at 6:00 PM.");
+      }
+
       if (form.id) {
         const { error } = await supabase.from("unavailability").update({
           start_date: form.start_date,
@@ -109,7 +136,7 @@ const UnavailabilityPage = () => {
       setEndDate("");
       toast.success(editingRequest ? "Request updated" : "Request submitted");
     },
-    onError: () => toast.error("Failed to save request"),
+    onError: (err: Error) => toast.error(err.message || "Failed to save request"),
   });
 
   const deleteMutation = useMutation({
@@ -208,6 +235,15 @@ const UnavailabilityPage = () => {
 
       {!canManage && !isAdmin && (
         <div className="rounded-lg border border-warning p-3 text-sm text-warning">A roster is currently in draft mode. Unavailability entries cannot be added, edited, or removed until the roster is published.</div>
+      )}
+
+      {!isAdmin && (
+        <div className="rounded-lg border-2 border-warning/60 bg-warning/10 p-3 text-sm text-warning">
+          <div className="flex items-start gap-2">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" />
+            <p className="font-medium">Unavailability for next week must be submitted by Friday 6:00 PM.</p>
+          </div>
+        </div>
       )}
 
       {isLoading ? (

@@ -32,6 +32,11 @@ interface UnavailabilityRow {
   status: string;
 }
 
+interface DateShiftAllocation {
+  id: string;
+  staff_id: string;
+}
+
 const RosterPage = () => {
   const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
@@ -116,6 +121,19 @@ const RosterPage = () => {
     enabled: isAdmin,
   });
 
+  const { data: dateAllocations = [] } = useQuery<DateShiftAllocation[]>({
+    queryKey: ["date-allocations", selectedDate],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("shifts")
+        .select("id, staff_id")
+        .eq("date", selectedDate);
+      if (error) throw error;
+      return (data ?? []) as DateShiftAllocation[];
+    },
+    enabled: isAdmin && !!selectedDate,
+  });
+
   // Build a set of staff_ids unavailable for the selected date
   const unavailableStaffForDate = useMemo(() => {
     const set = new Set<string>();
@@ -127,6 +145,15 @@ const RosterPage = () => {
     });
     return set;
   }, [unavailability, selectedDate]);
+
+  const alreadyAllocatedStaffForDate = useMemo(() => {
+    const allocated = new Set<string>();
+    dateAllocations.forEach((allocation) => {
+      if (editingShift?.id && allocation.id === editingShift.id) return;
+      allocated.add(allocation.staff_id);
+    });
+    return allocated;
+  }, [dateAllocations, editingShift?.id]);
 
   const hasUnpublished = isAdmin && shifts.some((s) => !s.published);
   const hasPublished = shifts.some((s) => s.published);
@@ -146,6 +173,23 @@ const RosterPage = () => {
 
   const saveMutation = useMutation({
     mutationFn: async (form: { id?: string; staff_id: string; date: string; start_time: string; end_time: string; area: string; notes: string }) => {
+      let duplicateShiftQuery = supabase
+        .from("shifts")
+        .select("id")
+        .eq("staff_id", form.staff_id)
+        .eq("date", form.date)
+        .limit(1);
+
+      if (form.id) {
+        duplicateShiftQuery = duplicateShiftQuery.neq("id", form.id);
+      }
+
+      const { data: existingShift, error: duplicateCheckError } = await duplicateShiftQuery;
+      if (duplicateCheckError) throw duplicateCheckError;
+      if ((existingShift ?? []).length > 0) {
+        throw new Error("This staff member already has a shift on that date.");
+      }
+
       if (form.id) {
         const { error } = await supabase.from("shifts").update({
           staff_id: form.staff_id,
@@ -245,6 +289,7 @@ const RosterPage = () => {
 
   const openCreate = () => {
     setEditingShift(null);
+    setSelectedDate(format(new Date(), "yyyy-MM-dd"));
     setDialogOpen(true);
   };
 
@@ -296,14 +341,16 @@ const RosterPage = () => {
                       <SelectContent>
                         {staffList.map((s) => {
                           const isUnavailable = unavailableStaffForDate.has(s.user_id);
+                          const isAllocated = alreadyAllocatedStaffForDate.has(s.user_id);
                           return (
                             <SelectItem
                               key={s.user_id}
                               value={s.user_id}
-                              disabled={isUnavailable}
-                              className={isUnavailable ? "opacity-50" : ""}
+                              disabled={isUnavailable || isAllocated}
+                              className={isUnavailable || isAllocated ? "opacity-50" : ""}
                             >
-                              {s.full_name}{isUnavailable ? " (Unavailable)" : ""}
+                              {s.full_name}
+                              {isUnavailable ? " (Unavailable)" : isAllocated ? " (Already allocated)" : ""}
                             </SelectItem>
                           );
                         })}

@@ -1,7 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
-import { Users, CalendarDays, MessageSquare, CalendarOff, Shield, ChevronRight } from "lucide-react";
+import { Users, CalendarDays, MessageSquare, CalendarOff, Triangle, ChevronRight } from "lucide-react";
 
 const adminLinks = [
   { to: "/staff", icon: Users, label: "Staff Management", desc: "Add, deactivate, manage roles" },
@@ -18,7 +18,7 @@ const AdminPage = () => {
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center gap-2">
-        <Shield className="h-5 w-5 text-primary" />
+        <Triangle className="h-5 w-5 text-primary" />
         <h1 className="text-xl font-bold text-foreground">Admin Controls</h1>
       </div>
 

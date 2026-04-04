@@ -52,27 +52,75 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const clearCorruptAuthStorage = () => {
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i += 1) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith("sb-") && key.includes("-auth-token")) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach((key) => localStorage.removeItem(key));
+      } catch (error) {
+        console.error("Failed to clear auth storage", error);
+      }
+    };
+
+    const hydrateUser = async (authUser: User) => {
+      try {
+        const appUser = await buildAppUser(authUser);
+        if (!cancelled) setUser(appUser);
+      } catch (error) {
+        console.error("Failed to load user profile/role, falling back to auth user", error);
+        if (!cancelled) {
+          setUser({
+            id: authUser.id,
+            name: authUser.email?.split("@")[0] || "User",
+            email: authUser.email || "",
+            role: "staff",
+          });
+        }
+      }
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        if (session?.user) {
-          const appUser = await buildAppUser(session.user);
-          setUser(appUser);
-        } else {
-          setUser(null);
+        try {
+          if (session?.user) {
+            await hydrateUser(session.user);
+          } else if (!cancelled) {
+            setUser(null);
+          }
+        } finally {
+          if (!cancelled) setLoading(false);
         }
-        setLoading(false);
       }
     );
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const appUser = await buildAppUser(session.user);
-        setUser(appUser);
+    const initializeSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          await hydrateUser(session.user);
+        }
+      } catch (error) {
+        console.error("Failed to restore session; clearing local auth storage", error);
+        clearCorruptAuthStorage();
+        if (!cancelled) setUser(null);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
-    });
+    };
 
-    return () => subscription.unsubscribe();
+    initializeSession();
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
