@@ -1,6 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarDays, MessageSquare, Users, CalendarOff, ChevronRight, Loader2, Clock, MapPin, LucideIcon } from "lucide-react";
+import { CalendarDays, MessageSquare, Users, CalendarOff, Shield, ChevronRight, Loader2, Clock, MapPin, LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format, parseISO, startOfWeek, addDays, isSameDay } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
@@ -193,7 +193,7 @@ const DashboardPage = () => {
         })}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      {/* Duplicate CTA grid removed; bottom nav already provides Leave and Messages access */}
         <Link to="/unavailability">
           <Card className="hover:shadow-md transition-shadow">
             <CardContent className="p-4 text-center">
@@ -210,7 +210,6 @@ const DashboardPage = () => {
             </CardContent>
           </Card>
         </Link>
-      </div>
     </div>
   );
 };

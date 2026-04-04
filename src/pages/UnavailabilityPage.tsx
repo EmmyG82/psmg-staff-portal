@@ -102,7 +102,7 @@ const UnavailabilityPage = () => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["unavailability"] });
+      queryClient.invalidateQueries({ queryKey: ["unavailability"], exact: false });
       setOpen(false);
       setEditingRequest(null);
       setStartDate("");
@@ -118,7 +118,7 @@ const UnavailabilityPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["unavailability"] });
+      queryClient.invalidateQueries({ queryKey: ["unavailability"], exact: false });
       toast.success("Request removed");
     },
     onError: () => toast.error("Failed to remove request"),
