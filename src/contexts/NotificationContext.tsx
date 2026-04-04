@@ -62,6 +62,78 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     loadNotifications();
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`notifications:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const row = payload.new as {
+            id: string;
+            title: string;
+            message: string;
+            type: string;
+            read: boolean;
+            created_at: string;
+          };
+
+          setNotifications((prev) => {
+            if (prev.some((item) => item.id === row.id)) return prev;
+            return [
+              {
+                id: row.id,
+                title: row.title,
+                message: row.message,
+                type: isNotificationType(row.type) ? row.type : "info",
+                read: row.read,
+                createdAt: new Date(row.created_at),
+              },
+              ...prev,
+            ];
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const row = payload.new as { id: string; read: boolean };
+          setNotifications((prev) => prev.map((n) => (n.id === row.id ? { ...n, read: row.read } : n)));
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const row = payload.old as { id: string };
+          setNotifications((prev) => prev.filter((n) => n.id !== row.id));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const addNotification = useCallback(

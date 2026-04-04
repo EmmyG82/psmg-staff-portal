@@ -159,10 +159,33 @@ const RosterPage = () => {
   const hasPublished = shifts.some((s) => s.published);
   const publishLabel = hasPublished ? "Republish Roster" : "Publish Roster";
 
+  const notifyAffectedStaff = async (staffIds: string[], title: string, message: string, type: "shift" | "roster") => {
+    const uniqueIds = [...new Set(staffIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return;
+
+    const { error } = await supabase.rpc("notify_users", {
+      _recipient_ids: uniqueIds,
+      _title: title,
+      _message: message,
+      _type: type,
+    });
+
+    if (error) {
+      console.error("Failed to create roster notifications", error);
+    }
+  };
+
   const statusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+    mutationFn: async ({ id, status, staffId, date }: { id: string; status: string; staffId: string; date: string }) => {
       const { error } = await supabase.from("shifts").update({ status, published: false }).eq("id", id);
       if (error) throw error;
+
+      await notifyAffectedStaff(
+        [staffId],
+        "Roster Change",
+        `Your shift on ${format(parseISO(date), "EEE d MMM")} was updated to ${status.replace("_", " ")}.`,
+        "shift"
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shifts"] });
@@ -173,6 +196,8 @@ const RosterPage = () => {
 
   const saveMutation = useMutation({
     mutationFn: async (form: { id?: string; staff_id: string; date: string; start_time: string; end_time: string; area: string; notes: string }) => {
+      const previousStaffId = editingShift?.staff_id;
+
       let duplicateShiftQuery = supabase
         .from("shifts")
         .select("id")
@@ -201,6 +226,17 @@ const RosterPage = () => {
           published: false,
         }).eq("id", form.id);
         if (error) throw error;
+
+        const affectedStaffIds = previousStaffId && previousStaffId !== form.staff_id
+          ? [previousStaffId, form.staff_id]
+          : [form.staff_id];
+
+        await notifyAffectedStaff(
+          affectedStaffIds,
+          "Roster Change",
+          `Your shift on ${format(parseISO(form.date), "EEE d MMM")} was updated.`,
+          "shift"
+        );
       } else {
         const { error } = await supabase.from("shifts").insert({
           staff_id: form.staff_id,
@@ -212,6 +248,13 @@ const RosterPage = () => {
           created_by: user!.id,
         });
         if (error) throw error;
+
+        await notifyAffectedStaff(
+          [form.staff_id],
+          "New Shift Assigned",
+          `A shift was added to your roster for ${format(parseISO(form.date), "EEE d MMM")}.`,
+          "shift"
+        );
       }
     },
     onSuccess: () => {
@@ -224,9 +267,16 @@ const RosterPage = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, staffId, date }: { id: string; staffId: string; date: string }) => {
       const { error } = await supabase.from("shifts").delete().eq("id", id);
       if (error) throw error;
+
+      await notifyAffectedStaff(
+        [staffId],
+        "Shift Removed",
+        `Your shift on ${format(parseISO(date), "EEE d MMM")} was removed from the roster.`,
+        "shift"
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shifts"] });
@@ -248,15 +298,12 @@ const RosterPage = () => {
 
       // Notify only affected staff
       const affectedStaffIds = [...new Set(unpublished.map((s) => s.staff_id))];
-      const notifications = affectedStaffIds.map((staffId) => ({
-        user_id: staffId,
-        title: "Roster Updated",
-        message: `Your roster for ${format(weekStart, "d MMM")} – ${format(weekEnd, "d MMM")} has been updated.`,
-        type: "roster",
-      }));
-      if (notifications.length > 0) {
-        await supabase.from("notifications").insert(notifications);
-      }
+      await notifyAffectedStaff(
+        affectedStaffIds,
+        "Roster Published",
+        `Your roster for ${format(weekStart, "d MMM")} – ${format(weekEnd, "d MMM")} has been published or updated.`,
+        "roster"
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shifts"] });
@@ -457,23 +504,23 @@ const RosterPage = () => {
                                   <DropdownMenuContent align="end">
                                     {shift.published && shift.status === "scheduled" && (
                                       <>
-                                        <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "staff_cancelled" })}>
+                                        <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "staff_cancelled", staffId: shift.staff_id, date: shift.date })}>
                                           <span className="h-3 w-3 rounded-full bg-red-600 mr-2" /> Staff Cancelled
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "admin_cancelled" })}>
+                                        <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "admin_cancelled", staffId: shift.staff_id, date: shift.date })}>
                                           <span className="h-3 w-3 rounded-full bg-black mr-2" /> Admin Cancelled
                                         </DropdownMenuItem>
                                       </>
                                     )}
                                     {isCancelled && (
-                                      <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "scheduled" })}>
+                                      <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "scheduled", staffId: shift.staff_id, date: shift.date })}>
                                         <Clock className="h-4 w-4 mr-2" /> Restore Shift
                                       </DropdownMenuItem>
                                     )}
                                     <DropdownMenuItem onClick={() => openEdit(shift)}>
                                       <Pencil className="h-4 w-4 mr-2" /> Edit
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(shift.id)}>
+                                    <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate({ id: shift.id, staffId: shift.staff_id, date: shift.date })}>
                                       <Trash2 className="h-4 w-4 mr-2" /> Delete
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>

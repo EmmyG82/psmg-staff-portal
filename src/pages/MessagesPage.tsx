@@ -47,21 +47,57 @@ const MessagesPage = () => {
     enabled: !!user,
   });
 
+  const notifyMessagePosted = async (content: string, isReply: boolean) => {
+    const truncatedContent = content.length > 120 ? `${content.slice(0, 117)}...` : content;
+    const title = isReply ? "New Message Reply" : "New Message";
+
+    const { error } = await supabase.rpc("notify_all_active_users", {
+      _title: title,
+      _message: truncatedContent,
+      _type: "message",
+      _exclude_user_id: user!.id,
+    });
+
+    if (error) {
+      console.error("Failed to create message notifications", error);
+    }
+  };
+
   const postMutation = useMutation({
     mutationFn: async (content: string) => {
-      const { error } = await supabase.from("messages").insert({
+      const isReply = !!replyTo;
+      const basePayload = {
         author_id: user!.id,
         content,
-        parent_id: replyTo,
-      });
-      if (error) throw error;
+      };
+
+      const payload = replyTo ? { ...basePayload, parent_id: replyTo } : basePayload;
+      const { error } = await supabase.from("messages").insert(payload);
+
+      if (!error) {
+        await notifyMessagePosted(content, isReply);
+        return;
+      }
+
+      // Backward-compatible fallback when `parent_id` has not been migrated yet.
+      const missingParentIdColumn = replyTo && /parent_id|column/i.test(error.message);
+      if (missingParentIdColumn) {
+        const { error: retryError } = await supabase.from("messages").insert(basePayload);
+        if (retryError) throw retryError;
+
+        await notifyMessagePosted(content, false);
+        return;
+      }
+
+      throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["messages"] });
       setNewMessage("");
       setReplyTo(null);
+      toast.success("Message posted");
     },
-    onError: () => toast.error("Failed to post message"),
+    onError: (error: Error) => toast.error(error.message || "Failed to post message"),
   });
 
   const pinMutation = useMutation({

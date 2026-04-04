@@ -101,6 +101,22 @@ const UnavailabilityPage = () => {
     enabled: !!user,
   });
 
+  const notifyAdminsOfSubmission = async (startDateValue: string, endDateValue: string) => {
+    const dateLabel = startDateValue === endDateValue
+      ? format(parseISO(startDateValue), "EEE d MMM")
+      : `${format(parseISO(startDateValue), "EEE d MMM")} - ${format(parseISO(endDateValue), "EEE d MMM")}`;
+
+    const { error } = await supabase.rpc("notify_admins", {
+      _title: "Unavailability Submitted",
+      _message: `${user!.name} submitted unavailability for ${dateLabel}.`,
+      _type: "warning",
+    });
+
+    if (error) {
+      console.error("Failed to notify admins about unavailability submission", error);
+    }
+  };
+
   const saveMutation = useMutation({
     mutationFn: async (form: { id?: string; start_date: string; end_date: string }) => {
       if (form.end_date < form.start_date) {
@@ -126,6 +142,10 @@ const UnavailabilityPage = () => {
           status: "approved",
         });
         if (error) throw error;
+
+        if (!isAdmin) {
+          await notifyAdminsOfSubmission(form.start_date, form.end_date);
+        }
       }
     },
     onSuccess: () => {

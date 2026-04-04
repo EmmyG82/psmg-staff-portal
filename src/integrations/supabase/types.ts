@@ -245,6 +245,34 @@ export type Database = {
         }
         Returns: boolean
       }
+      notify_admins: {
+        Args: {
+          _exclude_user_id?: string | null
+          _message: string
+          _title: string
+          _type?: string
+        }
+        Returns: number
+      }
+      notify_all_active_users: {
+        Args: {
+          _exclude_user_id?: string | null
+          _message: string
+          _title: string
+          _type?: string
+        }
+        Returns: number
+      }
+      notify_users: {
+        Args: {
+          _exclude_user_id?: string | null
+          _message: string
+          _recipient_ids: string[]
+          _title: string
+          _type?: string
+        }
+        Returns: number
+      }
     }
     Enums: {
       app_role: "admin" | "staff"

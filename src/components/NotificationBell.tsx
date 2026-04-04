@@ -4,6 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
+import { useNavigate } from "react-router-dom";
 
 const typeIcon = (type: Notification["type"]) => {
   switch (type) {
@@ -16,8 +17,26 @@ const typeIcon = (type: Notification["type"]) => {
   }
 };
 
+const getNotificationTarget = (type: Notification["type"]) => {
+  switch (type) {
+    case "message":
+      return "/messages";
+    case "shift":
+    case "roster":
+      return "/roster";
+    default:
+      return "/dashboard";
+  }
+};
+
 const NotificationBell = () => {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const navigate = useNavigate();
+
+  const handleNotificationClick = (notification: Notification) => {
+    markAsRead(notification.id);
+    navigate(getNotificationTarget(notification.type));
+  };
 
   return (
     <Popover>
@@ -47,7 +66,7 @@ const NotificationBell = () => {
             notifications.map((n) => (
               <button
                 key={n.id}
-                onClick={() => markAsRead(n.id)}
+                onClick={() => handleNotificationClick(n)}
                 className={`w-full text-left flex gap-3 p-3 border-b border-border last:border-0 transition-colors hover:bg-muted/50 ${
                   !n.read ? "bg-accent/50" : ""
                 }`}
