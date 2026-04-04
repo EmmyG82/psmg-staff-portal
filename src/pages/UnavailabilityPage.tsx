@@ -121,7 +121,10 @@ const UnavailabilityPage = () => {
       queryClient.invalidateQueries({ queryKey: ["unavailability"], exact: false });
       toast.success("Request removed");
     },
-    onError: () => toast.error("Failed to remove request"),
+    onError: (err: Error) => {
+      console.error("Delete unavailability error:", err);
+      toast.error("Failed to remove request");
+    },
   });
 
   if (!user) return null;
