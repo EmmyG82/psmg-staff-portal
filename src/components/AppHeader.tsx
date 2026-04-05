@@ -8,11 +8,11 @@ const AppHeader = () => {
   const { user, logout } = useAuth();
 
   return (
-    <header className="sticky top-0 z-40 bg-primary text-primary-foreground">
+    <header className="sticky top-0 z-40 border-b border-white/45 bg-white/55 text-foreground shadow-[0_8px_30px_rgba(31,35,51,0.06)] backdrop-blur-xl supports-[backdrop-filter]:bg-white/45">
       <div className="flex items-center justify-between px-4 h-14">
         <div className="flex items-center gap-2">
           <span className="text-lg font-bold tracking-tight">Parkside</span>
-          <span className="text-xs bg-primary-foreground/15 rounded-full px-2 py-0.5 font-medium capitalize">
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium capitalize text-primary">
             {user?.role}
           </span>
         </div>
@@ -22,7 +22,7 @@ const AppHeader = () => {
             variant="ghost"
             size="sm"
             onClick={logout}
-            className="text-primary-foreground hover:bg-primary-foreground/10 h-9 gap-1.5"
+            className="h-9 gap-1.5 text-foreground hover:bg-white/50 hover:text-foreground"
           >
             <LogOut className="h-4 w-4" />
             <span className="hidden sm:inline">Logout</span>

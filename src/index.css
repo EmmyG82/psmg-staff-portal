@@ -4,96 +4,136 @@
 
 @layer base {
   :root {
-    --background: 36 25% 96%;
-    --foreground: 30 15% 20%;
+    /* CORE PALETTE (from mockup)
+       Pastel Pink:    #F7C6D0 → 345 70% 85%
+       Pastel Blue:    #C9E4FF → 210 100% 88%
+       Pastel Lavender:#D9D2FF → 255 100% 90%
+       Coral Pop:      #FF6F61 →   6 100% 68%
+       Charcoal Navy:  #1F2333 → 230 25% 16%
+    */
+
+    /* BACKGROUND + TEXT */
+    --background: 220 25% 97%;      /* very light cool neutral */
+    --foreground: 230 25% 16%;      /* charcoal navy */
 
     --card: 0 0% 100%;
-    --card-foreground: 30 15% 20%;
+    --card-foreground: 230 25% 16%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 30 15% 20%;
+    --popover-foreground: 230 25% 16%;
 
-    --primary: 33 38% 56%;
+    /* PRIMARY = CORAL POP (buttons, main CTAs) */
+    --primary: 6 100% 68%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 30 25% 35%;
-    --secondary-foreground: 0 0% 98%;
+    /* SECONDARY = PASTEL BLUE (secondary buttons, soft highlights) */
+    --secondary: 210 100% 88%;
+    --secondary-foreground: 230 25% 20%;
 
-    --muted: 36 18% 91%;
-    --muted-foreground: 30 10% 45%;
+    /* MUTED = PASTEL LAVENDER (subtle surfaces, tags, chips) */
+    --muted: 255 100% 92%;
+    --muted-foreground: 230 20% 35%;
 
-    --accent: 33 30% 90%;
-    --accent-foreground: 30 30% 30%;
+    /* ACCENT = PASTEL PINK (fun accents, badges, small highlights) */
+    --accent: 345 70% 85%;
+    --accent-foreground: 230 25% 20%;
 
-    --destructive: 0 72% 51%;
+    /* STATUS COLOURS */
+    --destructive: 2 70% 55%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 33 18% 86%;
-    --input: 33 18% 86%;
-    --ring: 33 38% 56%;
+    --success: 145 35% 42%;
+    --success-foreground: 0 0% 98%;
+
+    --warning: 38 90% 55%;
+    --warning-foreground: 30 25% 15%;
+
+    /* BORDERS + INPUTS */
+    --border: 230 20% 85%;
+    --input: 230 20% 85%;
+    --ring: 6 100% 68%; /* coral focus ring */
 
     --radius: 0.75rem;
 
-    --success: 152 55% 40%;
-    --success-foreground: 0 0% 98%;
-
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 10%;
-
-    --sidebar-background: 30 20% 22%;
-    --sidebar-foreground: 36 20% 92%;
-    --sidebar-primary: 33 38% 56%;
+    /* SIDEBAR (if you use one) */
+    --sidebar-background: 230 25% 16%;   /* charcoal navy */
+    --sidebar-foreground: 220 25% 96%;   /* very light neutral */
+    --sidebar-primary: 6 100% 68%;       /* coral */
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 30 18% 30%;
-    --sidebar-accent-foreground: 36 20% 92%;
-    --sidebar-border: 30 15% 28%;
-    --sidebar-ring: 33 38% 56%;
+    --sidebar-accent: 255 100% 90%;      /* lavender */
+    --sidebar-accent-foreground: 230 25% 16%;
+    --sidebar-border: 230 20% 25%;
+    --sidebar-ring: 6 100% 68%;
   }
 
   .dark {
-    --background: 30 15% 8%;
-    --foreground: 36 18% 90%;
-    --card: 30 15% 12%;
-    --card-foreground: 36 18% 90%;
-    --popover: 30 15% 12%;
-    --popover-foreground: 36 18% 90%;
-    --primary: 33 42% 50%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 30 20% 40%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 30 12% 18%;
-    --muted-foreground: 30 10% 55%;
-    --accent: 33 20% 20%;
-    --accent-foreground: 33 35% 65%;
-    --destructive: 0 62% 30%;
+    --background: 230 25% 8%;
+    --foreground: 220 25% 96%;
+
+    --card: 230 25% 12%;
+    --card-foreground: 220 25% 96%;
+
+    --popover: 230 25% 12%;
+    --popover-foreground: 220 25% 96%;
+
+    --primary: 6 100% 68%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 230 25% 20%;
+    --secondary-foreground: 220 25% 96%;
+
+    --muted: 230 20% 18%;
+    --muted-foreground: 220 15% 70%;
+
+    --accent: 345 70% 70%;
+    --accent-foreground: 230 25% 10%;
+
+    --destructive: 2 70% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 30 12% 20%;
-    --input: 30 12% 20%;
-    --ring: 33 42% 50%;
-    --sidebar-background: 30 15% 6%;
-    --sidebar-foreground: 36 18% 90%;
-    --sidebar-primary: 33 42% 50%;
+
+    --success: 145 35% 40%;
+    --success-foreground: 0 0% 98%;
+
+    --warning: 38 90% 55%;
+    --warning-foreground: 30 25% 10%;
+
+    --border: 230 20% 22%;
+    --input: 230 20% 22%;
+    --ring: 6 100% 68%;
+
+    --sidebar-background: 230 25% 6%;
+    --sidebar-foreground: 220 25% 96%;
+    --sidebar-primary: 6 100% 68%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 30 12% 15%;
-    --sidebar-accent-foreground: 36 18% 90%;
-    --sidebar-border: 30 12% 15%;
-    --sidebar-ring: 33 42% 50%;
+    --sidebar-accent: 255 100% 85%;
+    --sidebar-accent-foreground: 230 25% 10%;
+    --sidebar-border: 230 20% 18%;
+    --sidebar-ring:6 100% 68%;
   }
 }
 
 @layer base {
+  html,
+  body,
+  #root {
+    min-height: 100vh;
+  }
+
   * {
     @apply border-border;
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
-    font-family: 'Fantasy', cursive, Georgia, arial;
-  }
-}
-
-@layer utilities {
-  .staff-shift-card {
-    @apply bg-card border border-border rounded-xl p-4 shadow-sm;
+    background: linear-gradient(
+      135deg,
+      hsl(345 70% 85%) 0%,
+      hsl(255 100% 90%) 50%,
+      hsl(210 100% 88%) 100%
+    );
+    background-attachment: fixed;
+    background-size: cover;
+    @apply text-foreground antialiased;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+      "Segoe UI", sans-serif;
   }
 }

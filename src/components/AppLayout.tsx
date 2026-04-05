@@ -9,7 +9,7 @@ const AppLayout = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -18,7 +18,7 @@ const AppLayout = () => {
   if (!user) return <Navigate to="/login" replace />;
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col">
       <AppHeader />
       <main className="flex-1 pb-20">
         <Outlet />

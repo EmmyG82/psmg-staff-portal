@@ -17,7 +17,7 @@ const LoginPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-primary">
+      <div className="min-h-screen flex items-center justify-center p-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary-foreground" />
       </div>
     );
@@ -42,7 +42,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-primary p-4">
+    <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="w-full max-w-sm shadow-xl border-0">
         <CardHeader className="text-center space-y-3 pb-2">
           <div className="mx-auto h-14 w-14 rounded-2xl bg-primary flex items-center justify-center">

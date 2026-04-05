@@ -41,7 +41,7 @@ const NotificationBell = () => {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="relative text-primary-foreground hover:bg-primary-foreground/10 h-9 w-9 p-0">
+        <Button variant="ghost" size="sm" className="relative h-9 w-9 p-0 text-foreground hover:bg-white/50 hover:text-foreground">
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground flex items-center justify-center px-1">

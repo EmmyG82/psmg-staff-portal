@@ -26,7 +26,7 @@ const MobileNav = () => {
   const links = isAdmin ? adminLinks : staffLinks;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border safe-area-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/45 bg-white/60 shadow-[0_-8px_30px_rgba(31,35,51,0.08)] backdrop-blur-xl supports-[backdrop-filter]:bg-white/50 safe-area-bottom">
       <div className="flex justify-around items-center h-16 px-1">
         {links.map(({ to, icon: Icon, label }) => {
           const active = pathname === to || (to !== "/dashboard" && pathname.startsWith(to));
