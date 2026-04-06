@@ -15,18 +15,18 @@ vi.mock("@/contexts/AuthContext", () => ({
 }));
 
 const updateUserMock = vi.fn();
-var maybeSingleMock = vi.fn().mockResolvedValue({ data: { full_name: "Test User", phone: "123456789" } });
-var eqMock = vi.fn().mockReturnValue({ maybeSingle: maybeSingleMock });
-var selectMock = vi.fn().mockReturnValue({ eq: eqMock });
-var fromMock = vi.fn().mockReturnValue({ select: selectMock });
-var signInWithPasswordMock = vi.fn();
+const maybeSingleMock = vi.fn().mockResolvedValue({ data: { full_name: "Test User", phone: "123456789" } });
+const eqMock = vi.fn().mockReturnValue({ maybeSingle: maybeSingleMock });
+const selectMock = vi.fn().mockReturnValue({ eq: eqMock });
+const fromMock = vi.fn().mockReturnValue({ select: selectMock });
+const signInWithPasswordMock = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    from: (...args: any[]) => fromMock(...args),
+    from: (...args: unknown[]) => fromMock(...args),
     auth: {
-      updateUser: (...args: any[]) => updateUserMock(...args),
-      signInWithPassword: (...args: any[]) => signInWithPasswordMock(...args),
+      updateUser: (...args: unknown[]) => updateUserMock(...args),
+      signInWithPassword: (...args: unknown[]) => signInWithPasswordMock(...args),
     },
   },
 }));
