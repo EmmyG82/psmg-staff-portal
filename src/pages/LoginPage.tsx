@@ -8,6 +8,7 @@ const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const { login, user, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -68,22 +69,22 @@ const LoginPage = () => {
         </div>
 
         {/* Title */}
-        <h1 className="text-3xl font-semibold">Parkside Motel</h1>
-        <p className="text-sm opacity-80 mb-10">Staff Portal</p>
+        <h1 className="text-3xl font-semibold tracking-wide">Parkside Motel</h1>
+        <p className="mb-10 text-sm text-white/80">Staff Portal</p>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
 
           {/* Email */}
           <div className="relative text-left">
-            <span className="absolute left-3 top-3 text-white/70">
+            <span className="absolute left-1 top-3 text-white/85">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
                 strokeWidth={2}
                 stroke="currentColor"
-                className="w-5 h-5"
+                className="h-4 w-4"
               >
                 <path
                   strokeLinecap="round"
@@ -95,24 +96,24 @@ const LoginPage = () => {
             <input
               id="email"
               type="email"
-              placeholder="Email"
+              placeholder="Username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full bg-transparent border-b border-white/40 pl-10 py-3 placeholder-white/70 text-white focus:outline-none focus:border-white"
+              className="w-full border-0 border-b border-white/45 bg-transparent pb-2.5 pl-8 pt-1 text-sm text-white placeholder:text-white/75 focus:outline-none focus:border-white/80"
             />
           </div>
 
           {/* Password */}
           <div className="relative text-left">
-            <span className="absolute left-3 top-3 text-white/70">
+            <span className="absolute left-1 top-3 text-white/85">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
                 strokeWidth={2}
                 stroke="currentColor"
-                className="w-5 h-5"
+                className="h-4 w-4"
               >
                 <path
                   strokeLinecap="round"
@@ -128,7 +129,7 @@ const LoginPage = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full bg-white/20 backdrop-blur border border-white/10 rounded-md pl-10 py-3 placeholder-white/70 text-white focus:outline-none focus:border-white"
+              className="w-full border-0 border-b border-white/45 bg-transparent pb-2.5 pl-8 pt-1 text-sm text-white placeholder:text-white/75 focus:outline-none focus:border-white/80"
             />
           </div>
 
@@ -137,9 +138,18 @@ const LoginPage = () => {
             <p className="text-sm bg-white/20 rounded-lg p-2.5 text-white">{error}</p>
           )}
 
-          {/* Forgot password */}
-          <div className="flex justify-end text-sm">
-            <Link to="/forgot-password" className="opacity-90 underline">
+          {/* Options */}
+          <div className="flex items-center justify-between text-xs text-white/85">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-3 w-3 rounded border-white/40 bg-transparent accent-white"
+              />
+              <span>Remember me</span>
+            </label>
+            <Link to="/forgot-password" className="underline underline-offset-2">
               Forgot password?
             </Link>
           </div>
