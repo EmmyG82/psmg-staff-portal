@@ -24,6 +24,8 @@ const getNotificationTarget = (type: Notification["type"]) => {
     case "shift":
     case "roster":
       return "/roster";
+    case "warning":
+      return "/unavailability";
     default:
       return "/dashboard";
   }
