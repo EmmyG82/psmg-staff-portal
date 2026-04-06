@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
@@ -50,6 +50,9 @@ async function buildAppUser(authUser: User): Promise<AppUser> {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  // Persists across effect re-runs (e.g. React StrictMode double-invoke) so
+  // the generation counter is never accidentally reset to 0.
+  const authGenRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,13 +72,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    const hydrateUser = async (authUser: User) => {
+    // Incremented on every auth-state-change event so that stale hydrateUser
+    // calls (e.g. from USER_UPDATED fired just before SIGNED_OUT) cannot
+    // overwrite the user state set by a later event.
+    const hydrateUser = async (authUser: User, gen: number) => {
       try {
         const appUser = await buildAppUser(authUser);
-        if (!cancelled) setUser(appUser);
+        if (!cancelled && authGenRef.current === gen) setUser(appUser);
       } catch (error) {
         console.error("Failed to load user profile/role, falling back to auth user", error);
-        if (!cancelled) {
+        if (!cancelled && authGenRef.current === gen) {
           setUser({
             id: authUser.id,
             name: authUser.email?.split("@")[0] || "User",
@@ -88,9 +94,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        const gen = ++authGenRef.current;
         try {
           if (session?.user) {
-            await hydrateUser(session.user);
+            await hydrateUser(session.user, gen);
           } else if (!cancelled) {
             setUser(null);
           }
@@ -101,10 +108,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
 
     const initializeSession = async () => {
+      const gen = ++authGenRef.current;
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          await hydrateUser(session.user);
+          await hydrateUser(session.user, gen);
         }
       } catch (error) {
         console.error("Failed to restore session; clearing local auth storage", error);
