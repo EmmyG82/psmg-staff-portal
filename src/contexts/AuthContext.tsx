@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
@@ -50,13 +50,12 @@ async function buildAppUser(authUser: User): Promise<AppUser> {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  // Persists across effect re-runs (e.g. React StrictMode double-invoke) so
+  // the generation counter is never accidentally reset to 0.
+  const authGenRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
-    // Incremented on every auth-state-change event so that stale hydrateUser
-    // calls (e.g. from USER_UPDATED fired just before SIGNED_OUT) cannot
-    // overwrite the user state set by a later event.
-    let currentGen = 0;
 
     const clearCorruptAuthStorage = () => {
       try {
@@ -73,13 +72,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
+    // Incremented on every auth-state-change event so that stale hydrateUser
+    // calls (e.g. from USER_UPDATED fired just before SIGNED_OUT) cannot
+    // overwrite the user state set by a later event.
     const hydrateUser = async (authUser: User, gen: number) => {
       try {
         const appUser = await buildAppUser(authUser);
-        if (!cancelled && currentGen === gen) setUser(appUser);
+        if (!cancelled && authGenRef.current === gen) setUser(appUser);
       } catch (error) {
         console.error("Failed to load user profile/role, falling back to auth user", error);
-        if (!cancelled && currentGen === gen) {
+        if (!cancelled && authGenRef.current === gen) {
           setUser({
             id: authUser.id,
             name: authUser.email?.split("@")[0] || "User",
@@ -92,7 +94,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        const gen = ++currentGen;
+        const gen = ++authGenRef.current;
         try {
           if (session?.user) {
             await hydrateUser(session.user, gen);
@@ -106,7 +108,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
 
     const initializeSession = async () => {
-      const gen = ++currentGen;
+      const gen = ++authGenRef.current;
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
