@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ChevronLeft, ChevronRight, Clock, Plus, MoreVertical, Pencil, Trash2, Send } from "lucide-react";
 import { format, addDays, startOfWeek, isSameDay, parseISO } from "date-fns";
@@ -35,6 +35,7 @@ interface UnavailabilityRow {
 interface DateShiftAllocation {
   id: string;
   staff_id: string;
+  date: string;
 }
 
 const RosterPage = () => {
@@ -122,38 +123,80 @@ const RosterPage = () => {
   });
 
   const { data: dateAllocations = [] } = useQuery<DateShiftAllocation[]>({
-    queryKey: ["date-allocations", selectedDate],
+    queryKey: ["date-allocations", weekStart.toISOString()],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("shifts")
-        .select("id, staff_id")
-        .eq("date", selectedDate);
+        .select("id, staff_id, date")
+        .gte("date", format(weekStart, "yyyy-MM-dd"))
+        .lte("date", format(weekEnd, "yyyy-MM-dd"));
       if (error) throw error;
       return (data ?? []) as DateShiftAllocation[];
     },
-    enabled: isAdmin && !!selectedDate,
+    enabled: isAdmin,
   });
 
-  // Build a set of staff_ids unavailable for the selected date
-  const unavailableStaffForDate = useMemo(() => {
-    const set = new Set<string>();
-    const d = selectedDate;
-    unavailability.forEach((u) => {
-      if (d >= u.start_date && d <= u.end_date) {
-        set.add(u.staff_id);
-      }
+  const unavailableStaffByDate = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+
+    weekDays.forEach((day) => {
+      const dayKey = format(day, "yyyy-MM-dd");
+      map[dayKey] = new Set<string>();
     });
-    return set;
-  }, [unavailability, selectedDate]);
+
+    unavailability.forEach((u) => {
+      weekDays.forEach((day) => {
+        const dayKey = format(day, "yyyy-MM-dd");
+        if (dayKey >= u.start_date && dayKey <= u.end_date) {
+          map[dayKey].add(u.staff_id);
+        }
+      });
+    });
+
+    return map;
+  }, [unavailability, weekDays]);
+
+  const alreadyAllocatedStaffByDate = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+
+    weekDays.forEach((day) => {
+      map[format(day, "yyyy-MM-dd")] = new Set<string>();
+    });
+
+    dateAllocations.forEach((allocation) => {
+      if (!map[allocation.date]) {
+        map[allocation.date] = new Set<string>();
+      }
+      map[allocation.date].add(allocation.staff_id);
+    });
+
+    return map;
+  }, [dateAllocations, weekDays]);
+
+  const unavailableStaffForDate = useMemo(() => {
+    return unavailableStaffByDate[selectedDate] ?? new Set<string>();
+  }, [unavailableStaffByDate, selectedDate]);
 
   const alreadyAllocatedStaffForDate = useMemo(() => {
-    const allocated = new Set<string>();
-    dateAllocations.forEach((allocation) => {
-      if (editingShift?.id && allocation.id === editingShift.id) return;
-      allocated.add(allocation.staff_id);
-    });
+    const allocated = new Set(alreadyAllocatedStaffByDate[selectedDate] ?? []);
+    if (editingShift?.id) {
+      allocated.delete(editingShift.staff_id);
+    }
     return allocated;
-  }, [dateAllocations, editingShift?.id]);
+  }, [alreadyAllocatedStaffByDate, editingShift?.id, editingShift?.staff_id, selectedDate]);
+
+  const createShiftForDay = (staffId: string, date: string) => {
+    setEditingShift(null);
+    setSelectedDate(date);
+    saveMutation.mutate({
+      staff_id: staffId,
+      date,
+      start_time: "10:00",
+      end_time: "23:59",
+      area: "General",
+      notes: "",
+    });
+  };
 
   const hasUnpublished = isAdmin && shifts.some((s) => !s.published);
   const hasPublished = shifts.some((s) => s.published);
@@ -334,12 +377,6 @@ const RosterPage = () => {
     setDialogOpen(true);
   };
 
-  const openCreate = () => {
-    setEditingShift(null);
-    setSelectedDate(format(new Date(), "yyyy-MM-dd"));
-    setDialogOpen(true);
-  };
-
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -360,67 +397,65 @@ const RosterPage = () => {
                 {publishMutation.isPending ? "Publishing..." : publishLabel}
               </Button>
             )}
-            <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingShift(null); }}>
-              <DialogTrigger asChild>
-                <Button size="sm" onClick={openCreate}>
-                  <Plus className="h-4 w-4 mr-1" /> Add Shift
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{editingShift ? "Edit Shift" : "Add Shift"}</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <Label htmlFor="date">Date</Label>
-                    <Input
-                      name="date"
-                      type="date"
-                      defaultValue={editingShift?.date ?? format(new Date(), "yyyy-MM-dd")}
-                      required
-                      onChange={(e) => setSelectedDate(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="staff_id">Staff Member</Label>
-                    <Select name="staff_id" defaultValue={editingShift?.staff_id ?? ""} required>
-                      <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
-                      <SelectContent>
-                        {staffList.map((s) => {
-                          const isUnavailable = unavailableStaffForDate.has(s.user_id);
-                          const isAllocated = alreadyAllocatedStaffForDate.has(s.user_id);
-                          return (
-                            <SelectItem
-                              key={s.user_id}
-                              value={s.user_id}
-                              disabled={isUnavailable || isAllocated}
-                              className={isUnavailable || isAllocated ? "opacity-50" : ""}
-                            >
-                              {s.full_name}
-                              {isUnavailable ? " (Unavailable)" : isAllocated ? " (Already allocated)" : ""}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Shift Time</Label>
-                    <p className="text-sm text-muted-foreground mt-1">10:00am – Until Required</p>
-                  </div>
-                  <div>
-                    <Label htmlFor="notes">Notes (optional)</Label>
-                    <Input name="notes" defaultValue={editingShift?.notes ?? ""} placeholder="Any notes" />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={saveMutation.isPending}>
-                    {saveMutation.isPending ? "Saving..." : editingShift ? "Update Shift" : "Create Shift"}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
           </div>
         )}
       </div>
+
+      {isAdmin && (
+        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingShift(null); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingShift ? "Edit Shift" : "Add Shift"}</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="date">Date</Label>
+                <Input
+                  name="date"
+                  type="date"
+                  defaultValue={editingShift?.date ?? format(new Date(), "yyyy-MM-dd")}
+                  required
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="staff_id">Staff Member</Label>
+                <Select name="staff_id" defaultValue={editingShift?.staff_id ?? ""} required>
+                  <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
+                  <SelectContent>
+                    {staffList.map((s) => {
+                      const isUnavailable = unavailableStaffForDate.has(s.user_id);
+                      const isAllocated = alreadyAllocatedStaffForDate.has(s.user_id);
+                      return (
+                        <SelectItem
+                          key={s.user_id}
+                          value={s.user_id}
+                          disabled={isUnavailable || isAllocated}
+                          className={isUnavailable || isAllocated ? "opacity-50" : ""}
+                        >
+                          {s.full_name}
+                          {isUnavailable ? " (Unavailable)" : isAllocated ? " (Already allocated)" : ""}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Shift Time</Label>
+                <p className="text-sm text-muted-foreground mt-1">10:00am – Until Required</p>
+              </div>
+              <div>
+                <Label htmlFor="notes">Notes (optional)</Label>
+                <Input name="notes" defaultValue={editingShift?.notes ?? ""} placeholder="Any notes" />
+              </div>
+              <Button type="submit" className="w-full" disabled={saveMutation.isPending}>
+                {saveMutation.isPending ? "Saving..." : editingShift ? "Update Shift" : "Create Shift"}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <div className="flex items-center justify-between bg-card rounded-xl border border-border p-2">
         <Button variant="ghost" size="icon" onClick={() => setWeekStart(addDays(weekStart, -7))}>
@@ -441,13 +476,49 @@ const RosterPage = () => {
           {weekDays.map((day) => {
             const dayShifts = shifts.filter((s) => isSameDay(parseISO(s.date), day));
             const isToday = isSameDay(day, new Date());
+            const dayDate = format(day, "yyyy-MM-dd");
+            const unavailableStaffForDay = unavailableStaffByDate[dayDate] ?? new Set<string>();
+            const alreadyAllocatedStaffForDay = alreadyAllocatedStaffByDate[dayDate] ?? new Set<string>();
 
             return (
               <div key={day.toISOString()}>
-                <p className={`text-xs font-semibold uppercase tracking-wider mb-1.5 ${isToday ? "text-primary" : "text-muted-foreground"}`}>
-                  {format(day, "EEEE d MMM")}
-                  {isToday && <span className="ml-1.5 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">Today</span>}
-                </p>
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <p className={`text-xs font-semibold uppercase tracking-wider ${isToday ? "text-primary" : "text-muted-foreground"}`}>
+                    {format(day, "EEEE d MMM")}
+                    {isToday && <span className="ml-1.5 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">Today</span>}
+                  </p>
+                  {isAdmin && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs"
+                          disabled={saveMutation.isPending}
+                        >
+                          <Plus className="h-3.5 w-3.5 mr-1" /> Add Shift
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="max-h-64 overflow-y-auto">
+                        {staffList.map((staff) => {
+                          const isUnavailable = unavailableStaffForDay.has(staff.user_id);
+                          const isAllocated = alreadyAllocatedStaffForDay.has(staff.user_id);
+                          return (
+                            <DropdownMenuItem
+                              key={`${dayDate}-${staff.user_id}`}
+                              disabled={isUnavailable || isAllocated || saveMutation.isPending}
+                              className={isUnavailable || isAllocated ? "opacity-50" : ""}
+                              onClick={() => createShiftForDay(staff.user_id, dayDate)}
+                            >
+                              {staff.full_name}
+                              {isUnavailable ? " (Unavailable)" : isAllocated ? " (Already allocated)" : ""}
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
                 {dayShifts.length === 0 ? (
                   <Card className="border-dashed">
                     <CardContent className="p-3 text-center text-sm text-muted-foreground">
