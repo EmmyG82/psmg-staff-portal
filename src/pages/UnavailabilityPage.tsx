@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Calendar, Loader2, Info } from "lucide-react";
-import { format, parseISO, startOfWeek, addDays, setHours, setMinutes } from "date-fns";
+import { format, parseISO, startOfWeek, addDays, setHours, setMinutes, subDays, startOfDay, addWeeks } from "date-fns";
 import { toast } from "sonner";
 
 type UnavailabilityRequest = {
@@ -37,25 +37,27 @@ const UnavailabilityPage = () => {
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 6);
+  const now = new Date();
 
-  const isFollowingWeekLocked = () => {
-    const now = new Date();
-    const thisWeekStart = startOfWeek(now, { weekStartsOn: 1 });
-    const thisWeekFriday = addDays(thisWeekStart, 4);
-    const cutoff = setMinutes(setHours(thisWeekFriday, 18), 0);
+  const getWeekCutoff = (submittedWeekStart: Date) =>
+    setMinutes(setHours(subDays(submittedWeekStart, 3), 18), 0);
+
+  const isSubmissionLockedForWeek = (startDateValue: string, now: Date) => {
+    const submittedWeekStart = startOfWeek(parseISO(startDateValue), { weekStartsOn: 1 });
+    const cutoff = getWeekCutoff(submittedWeekStart);
     return now >= cutoff;
   };
 
-  const overlapsFollowingWeek = (startDateValue: string, endDateValue: string) => {
-    const now = new Date();
-    const thisWeekStart = startOfWeek(now, { weekStartsOn: 1 });
-    const nextWeekStart = addDays(thisWeekStart, 7);
-    const nextWeekEnd = addDays(nextWeekStart, 6);
-
-    const start = parseISO(startDateValue);
-    const end = parseISO(endDateValue);
-    return start <= nextWeekEnd && end >= nextWeekStart;
-  };
+  const currentWeekStart = startOfWeek(now, { weekStartsOn: 1 });
+  const isCurrentWeekLocked = now >= getWeekCutoff(currentWeekStart);
+  const openWeekStart = isCurrentWeekLocked ? addDays(currentWeekStart, 7) : currentWeekStart;
+  const openWeekEnd = addDays(openWeekStart, 6);
+  const openWeekCutoff = getWeekCutoff(openWeekStart);
+  const nextWeekStart = addDays(currentWeekStart, 7);
+  const nextWeekCutoff = getWeekCutoff(nextWeekStart);
+  const minSubmissionDateString = format(startOfDay(now), "yyyy-MM-dd");
+  const maxSubmissionDate = addWeeks(startOfDay(now), 8);
+  const maxSubmissionDateString = format(maxSubmissionDate, "yyyy-MM-dd");
 
   const { data: rosterDraft = false } = useQuery<boolean>({
     queryKey: ["roster-draft", weekStart.toISOString()],
@@ -123,8 +125,24 @@ const UnavailabilityPage = () => {
         throw new Error("End date must be on or after the start date.");
       }
 
-      if (!isAdmin && isFollowingWeekLocked() && overlapsFollowingWeek(form.start_date, form.end_date)) {
-        throw new Error("Unavailability for next week closes on Friday at 6:00 PM.");
+      if (!isAdmin) {
+        const now = new Date();
+        const today = startOfDay(now);
+        const start = startOfDay(parseISO(form.start_date));
+        const end = startOfDay(parseISO(form.end_date));
+        const maxDate = addWeeks(today, 8);
+
+        if (start < today) {
+          throw new Error("Cannot submit unavailability for past dates.");
+        }
+
+        if (end > maxDate) {
+          throw new Error(`Unavailability can only be submitted up to 8 weeks ahead (${format(maxDate, "EEE d MMM")}).`);
+        }
+
+        if (isSubmissionLockedForWeek(form.start_date, now)) {
+          throw new Error("Unavailability for this week closed on Friday at 6:00 PM. You can only submit for next week and beyond.");
+        }
       }
 
       if (form.id) {
@@ -225,6 +243,8 @@ const UnavailabilityPage = () => {
                       required
                       className="h-11"
                       value={startDate}
+                      min={minSubmissionDateString}
+                      max={maxSubmissionDateString}
                       onChange={(e) => setStartDate(e.target.value)}
                     />
                   </div>
@@ -236,6 +256,8 @@ const UnavailabilityPage = () => {
                       required
                       className="h-11"
                       value={endDate}
+                      min={startDate || minSubmissionDateString}
+                      max={maxSubmissionDateString}
                       onChange={(e) => setEndDate(e.target.value)}
                     />
                   </div>
@@ -261,7 +283,10 @@ const UnavailabilityPage = () => {
         <div className="rounded-lg border-2 border-warning/60 bg-warning/10 p-3 text-sm text-warning">
           <div className="flex items-start gap-2">
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
-            <p className="font-medium">Unavailability for next week must be submitted by Friday 6:00 PM.</p>
+            <div className="space-y-1">
+              <p className="font-medium">Next week submissions close: {format(nextWeekCutoff, "EEE d MMM, h:mm a")}</p>
+              <p>Currently open: {format(openWeekStart, "EEE d MMM")} - {format(openWeekEnd, "EEE d MMM")}. You can submit up to {format(maxSubmissionDate, "EEE d MMM")}.</p>
+            </div>
           </div>
         </div>
       )}
