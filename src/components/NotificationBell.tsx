@@ -33,8 +33,8 @@ const NotificationBell = () => {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const navigate = useNavigate();
 
-  const handleNotificationClick = (notification: Notification) => {
-    markAsRead(notification.id);
+  const handleNotificationClick = async (notification: Notification) => {
+    await markAsRead(notification.id);
     navigate(getNotificationTarget(notification.type));
   };
 
@@ -54,7 +54,14 @@ const NotificationBell = () => {
         <div className="flex items-center justify-between p-3 border-b border-border">
           <h3 className="text-sm font-semibold text-foreground">Notifications</h3>
           {unreadCount > 0 && (
-            <Button variant="ghost" size="sm" className="text-xs h-auto py-1 px-2 text-primary" onClick={markAllAsRead}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs h-auto py-1 px-2 text-primary"
+              onClick={() => {
+                void markAllAsRead();
+              }}
+            >
               Mark all read
             </Button>
           )}
@@ -66,7 +73,9 @@ const NotificationBell = () => {
             notifications.map((n) => (
               <button
                 key={n.id}
-                onClick={() => handleNotificationClick(n)}
+                onClick={() => {
+                  void handleNotificationClick(n);
+                }}
                 className={`w-full text-left flex gap-3 p-3 border-b border-border last:border-0 transition-colors hover:bg-muted/50 ${
                   !n.read ? "bg-accent/50" : ""
                 }`}

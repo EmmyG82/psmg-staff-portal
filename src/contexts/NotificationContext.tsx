@@ -15,8 +15,8 @@ interface NotificationContextType {
   notifications: Notification[];
   unreadCount: number;
   addNotification: (n: Omit<Notification, "id" | "read" | "createdAt">) => void;
-  markAsRead: (id: string) => void;
-  markAllAsRead: () => void;
+  markAsRead: (id: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
   clearAll: () => void;
 }
 
@@ -169,15 +169,38 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     [user]
   );
 
-  const markAsRead = useCallback((id: string) => {
-    void supabase.from("notifications").update({ read: true }).eq("id", id);
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-  }, []);
+  const markAsRead = useCallback(async (id: string) => {
+    if (!user) return;
 
-  const markAllAsRead = useCallback(() => {
-    if (user) {
-      void supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
+    const { error } = await supabase
+      .from("notifications")
+      .update({ read: true })
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .eq("read", false);
+
+    if (error) {
+      console.error("Failed to mark notification as read", error);
+      return;
     }
+
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+  }, [user]);
+
+  const markAllAsRead = useCallback(async () => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("notifications")
+      .update({ read: true })
+      .eq("user_id", user.id)
+      .eq("read", false);
+
+    if (error) {
+      console.error("Failed to mark all notifications as read", error);
+      return;
+    }
+
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   }, [user]);
 
