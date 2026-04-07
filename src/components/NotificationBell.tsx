@@ -17,13 +17,15 @@ const typeIcon = (type: Notification["type"]) => {
   }
 };
 
-const getNotificationTarget = (type: Notification["type"]) => {
+export const getNotificationTarget = (type: Notification["type"]) => {
   switch (type) {
     case "message":
       return "/messages";
     case "shift":
     case "roster":
       return "/roster";
+    case "warning":
+      return "/unavailability";
     default:
       return "/dashboard";
   }
