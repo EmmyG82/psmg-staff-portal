@@ -12,11 +12,10 @@ import { Loader2, User, Phone, Mail, Lock } from "lucide-react";
 
 const ProfilePage = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [fullName, setFullName] = useState(user?.name || "");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState(user?.email || "");
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
@@ -57,23 +56,32 @@ const ProfilePage = () => {
 
   const handleUpdateEmail = async () => {
     if (!email.trim()) return;
+    if (email.trim().toLowerCase() === user?.email?.toLowerCase()) {
+      toast({ title: "Error", description: "New email is the same as your current email.", variant: "destructive" });
+      return;
+    }
     setSavingEmail(true);
-    const { error } = await supabase.auth.updateUser({ email: email.trim() });
-    setSavingEmail(false);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Confirmation email sent", description: "Check your inbox to confirm the new email address and then re-login." });
-      await logout();
-      navigate("/login");
+    try {
+      const { error } = await supabase.auth.updateUser({ email: email.trim() });
+      if (error) {
+        const message =
+          error.status === 429
+            ? "Too many requests. Please wait a few minutes before trying again."
+            : error.message;
+        toast({ title: "Error", description: message, variant: "destructive" });
+      } else {
+        toast({ title: "Confirmation email sent", description: "Check your inbox to confirm the new email address and then re-login." });
+        setTimeout(() => navigate("/login"), 500);
+      }
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "An unexpected error occurred.";
+      toast({ title: "Error", description: message, variant: "destructive" });
+    } finally {
+      setSavingEmail(false);
     }
   };
 
   const handleChangePassword = async () => {
-    if (!currentPassword.trim()) {
-      toast({ title: "Error", description: "Current password is required", variant: "destructive" });
-      return;
-    }
     if (newPassword.length < 6) {
       toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
       return;
@@ -83,34 +91,24 @@ const ProfilePage = () => {
       return;
     }
     setSavingPassword(true);
-
-    // First re-authenticate with current password
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: user?.email || "",
-      password: currentPassword,
-    });
-
-    if (authError) {
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      } else {
+        setNewPassword("");
+        setConfirmPassword("");
+        toast({
+          title: "Password changed successfully",
+          description: "Please log in with your new password.",
+        });
+        setTimeout(() => navigate("/login"), 500);
+      }
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "An unexpected error occurred.";
+      toast({ title: "Error", description: message, variant: "destructive" });
+    } finally {
       setSavingPassword(false);
-      toast({ title: "Error", description: "Current password is incorrect", variant: "destructive" });
-      return;
-    }
-
-    // Then update to new password
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    setSavingPassword(false);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      toast({
-        title: "Password changed successfully",
-        description: "Please log in with your new password.",
-      });
-      await logout();
-      navigate("/login");
     }
   };
 
@@ -164,10 +162,6 @@ const ProfilePage = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="currentPassword">Current Password</Label>
-            <Input id="currentPassword" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
-          </div>
           <div className="space-y-2">
             <Label htmlFor="newPassword">New Password</Label>
             <Input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min 6 characters" />

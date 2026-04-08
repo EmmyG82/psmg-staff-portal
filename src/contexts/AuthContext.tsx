@@ -138,8 +138,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
     setUser(null);
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch (error) {
+      console.error("Failed to sign out locally", error);
+    }
   };
 
   return (
