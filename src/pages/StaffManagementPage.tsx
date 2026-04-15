@@ -59,8 +59,12 @@ const StaffManagementPage = () => {
 
   const createStaffMutation = useMutation({
     mutationFn: async (data: { email: string; full_name: string; phone: string; role: string }) => {
-      const res = await supabase.functions.invoke("create-staff", { body: data });
-      if (res.error) throw new Error(res.error.message);
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await supabase.functions.invoke("create-staff", {
+        body: data,
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+      });
+      if (res.error) throw new Error(res.data?.error || res.error.message);
       if (res.data?.error) throw new Error(res.data.error);
       return res.data;
     },
@@ -77,10 +81,12 @@ const StaffManagementPage = () => {
 
   const updateStaffMutation = useMutation({
     mutationFn: async (data: { user_id: string; full_name?: string; phone?: string; role?: string }) => {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await supabase.functions.invoke("manage-staff", {
         body: { action: "update", ...data },
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
       });
-      if (res.error) throw new Error(res.error.message);
+      if (res.error) throw new Error(res.data?.error || res.error.message);
       if (res.data?.error) throw new Error(res.data.error);
       return res.data;
     },
@@ -97,10 +103,12 @@ const StaffManagementPage = () => {
 
   const toggleActiveMutation = useMutation({
     mutationFn: async ({ user_id, active }: { user_id: string; active: boolean }) => {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await supabase.functions.invoke("manage-staff", {
         body: { action: "toggle_active", user_id, active },
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
       });
-      if (res.error) throw new Error(res.error.message);
+      if (res.error) throw new Error(res.data?.error || res.error.message);
       if (res.data?.error) throw new Error(res.data.error);
       return res.data;
     },
