@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -47,6 +47,11 @@ const MessagesPage = () => {
     enabled: !!user,
   });
 
+  const replyTarget = useMemo(
+    () => (replyTo ? messages.find((m) => m.id === replyTo) ?? null : null),
+    [messages, replyTo],
+  );
+
   const notifyMessagePosted = async (content: string, isReply: boolean) => {
     const truncatedContent = content.length > 120 ? `${content.slice(0, 117)}...` : content;
     const title = isReply ? "New Message Reply" : "New Message";
@@ -66,30 +71,14 @@ const MessagesPage = () => {
   const postMutation = useMutation({
     mutationFn: async (content: string) => {
       const isReply = !!replyTo;
-      const basePayload = {
-        author_id: user!.id,
-        content,
-      };
+      const payload = replyTo
+        ? { author_id: user!.id, content, parent_id: replyTo }
+        : { author_id: user!.id, content };
 
-      const payload = replyTo ? { ...basePayload, parent_id: replyTo } : basePayload;
       const { error } = await supabase.from("messages").insert(payload);
+      if (error) throw error;
 
-      if (!error) {
-        await notifyMessagePosted(content, isReply);
-        return;
-      }
-
-      // Backward-compatible fallback when `parent_id` has not been migrated yet.
-      const missingParentIdColumn = replyTo && /parent_id|column/i.test(error.message);
-      if (missingParentIdColumn) {
-        const { error: retryError } = await supabase.from("messages").insert(basePayload);
-        if (retryError) throw retryError;
-
-        await notifyMessagePosted(content, false);
-        return;
-      }
-
-      throw error;
+      await notifyMessagePosted(content, isReply);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["messages"] });
@@ -129,19 +118,31 @@ const MessagesPage = () => {
 
       <Card>
         <CardContent className="p-3">
-          {replyTo && (
-            <div className="mb-2 p-2 bg-muted/50 rounded text-sm text-muted-foreground">
-              Replying to message
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 ml-2 text-xs"
-                onClick={() => setReplyTo(null)}
-              >
-                Cancel
-              </Button>
-            </div>
-          )}
+          {replyTo && (() => {
+            const snippet = replyTarget
+              ? replyTarget.content.length > 80
+                ? `${replyTarget.content.slice(0, 77)}…`
+                : replyTarget.content
+              : null;
+            return (
+              <div className="mb-2 p-2 bg-muted/50 rounded text-sm text-muted-foreground flex items-start justify-between gap-2">
+                <span className="min-w-0">
+                  <span className="font-medium">Replying</span>
+                  {snippet && (
+                    <span className="ml-1 italic truncate">"{snippet}"</span>
+                  )}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 shrink-0 text-xs"
+                  onClick={() => setReplyTo(null)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            );
+          })()}
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -256,11 +257,12 @@ const MessagesPage = () => {
                         </div>
                         <p className="text-sm text-foreground leading-relaxed">{reply.content}</p>
                         <div className="flex gap-2 mt-2">
+                          {/* Replies always target the top-level message to enforce 1-level nesting */}
                           <Button
                             variant="ghost"
                             size="sm"
                             className="h-6 text-xs text-muted-foreground gap-1"
-                            onClick={() => setReplyTo(reply.id)}
+                            onClick={() => setReplyTo(reply.parent_id ?? reply.id)}
                           >
                             <Reply className="h-3 w-3" /> Reply
                           </Button>
