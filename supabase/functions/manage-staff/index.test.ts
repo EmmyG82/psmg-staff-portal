@@ -22,8 +22,10 @@ function createFakeClient(options: FakeOptions) {
         return {
           select: (_columns: string) => ({
             eq: (_column1: string, _value1: string) => ({
-              eq: async (_column2: string, _value2: string) => ({
-                data: options.isAdmin === false ? null : { role: "admin" },
+              eq: (_column2: string, _value2: string) => ({
+                maybeSingle: async () => ({
+                  data: options.isAdmin === false ? null : { role: "admin" },
+                }),
               }),
             }),
           }),
