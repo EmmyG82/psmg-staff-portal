@@ -24,6 +24,21 @@ type StaffMember = {
   role: string;
 };
 
+const withTimeout = async <T,>(promise: Promise<T>, ms: number, message: string): Promise<T> => {
+  return await new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+};
+
 const StaffManagementPage = () => {
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
@@ -44,6 +59,44 @@ const StaffManagementPage = () => {
   const [editPhone, setEditPhone] = useState("");
   const [editRole, setEditRole] = useState<string>("staff");
 
+  const getAccessToken = async () => {
+    const { data: sessionData } = await withTimeout(
+      supabase.auth.getSession(),
+      8000,
+      "Session check timed out. Please reload and sign in again."
+    );
+
+    let token = sessionData.session?.access_token;
+
+    // Only try refresh when there is no current access token.
+    if (!token) {
+      const { data: refreshData, error: refreshError } = await withTimeout(
+        supabase.auth.refreshSession(),
+        10000,
+        "Auth refresh timed out. Please sign out and sign in again."
+      );
+      if (refreshError) {
+        throw new Error("Session refresh failed. Please sign out and sign in again.");
+      }
+      token = refreshData.session?.access_token;
+    }
+
+    if (!token) {
+      throw new Error("Session expired. Please sign out and sign in again.");
+    }
+
+    const { error: userError } = await withTimeout(
+      supabase.auth.getUser(token),
+      10000,
+      "Session validation timed out. Please sign out and sign in again."
+    );
+    if (userError) {
+      throw new Error("Session is invalid. Please sign out and sign in again.");
+    }
+
+    return token;
+  };
+
   const { data: staffList = [], isLoading } = useQuery({
     queryKey: ["staff-list"],
     queryFn: async () => {
@@ -59,11 +112,15 @@ const StaffManagementPage = () => {
 
   const createStaffMutation = useMutation({
     mutationFn: async (data: { email: string; full_name: string; phone: string; role: string }) => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await supabase.functions.invoke("create-staff", {
-        body: data,
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
-      });
+      const accessToken = await getAccessToken();
+      const res = await withTimeout(
+        supabase.functions.invoke("create-staff", {
+          body: data,
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }),
+        20000,
+        "Create staff request timed out. Please try again."
+      );
       if (res.error) throw new Error(res.data?.error || res.error.message);
       if (res.data?.error) throw new Error(res.data.error);
       return res.data;
@@ -81,11 +138,15 @@ const StaffManagementPage = () => {
 
   const updateStaffMutation = useMutation({
     mutationFn: async (data: { user_id: string; full_name?: string; phone?: string; role?: string }) => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await supabase.functions.invoke("manage-staff", {
-        body: { action: "update", ...data },
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
-      });
+      const accessToken = await getAccessToken();
+      const res = await withTimeout(
+        supabase.functions.invoke("manage-staff", {
+          body: { action: "update", ...data },
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }),
+        20000,
+        "Update staff request timed out. Please try again."
+      );
       if (res.error) throw new Error(res.data?.error || res.error.message);
       if (res.data?.error) throw new Error(res.data.error);
       return res.data;
@@ -103,11 +164,15 @@ const StaffManagementPage = () => {
 
   const toggleActiveMutation = useMutation({
     mutationFn: async ({ user_id, active }: { user_id: string; active: boolean }) => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await supabase.functions.invoke("manage-staff", {
-        body: { action: "toggle_active", user_id, active },
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
-      });
+      const accessToken = await getAccessToken();
+      const res = await withTimeout(
+        supabase.functions.invoke("manage-staff", {
+          body: { action: "toggle_active", user_id, active },
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }),
+        20000,
+        "Toggle status request timed out. Please try again."
+      );
       if (res.error) throw new Error(res.data?.error || res.error.message);
       if (res.data?.error) throw new Error(res.data.error);
       return res.data;

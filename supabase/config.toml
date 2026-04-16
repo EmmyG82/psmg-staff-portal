@@ -1,1 +1,7 @@
-project_id = "hyiskzkaxyonjwxbcsml"
+project_id = "hjkzrmgwafytludvvxsi"
+
+[functions.create-staff]
+verify_jwt = false
+
+[functions.manage-staff]
+verify_jwt = false

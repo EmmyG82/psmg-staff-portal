@@ -121,9 +121,15 @@ export function buildManageStaffHandler(
 
         // Update role if provided
         if (role !== undefined) {
+          const { error: clearRoleError } = await adminClient
+            .from("user_roles")
+            .delete()
+            .eq("user_id", user_id);
+          if (clearRoleError) throw new Error(clearRoleError.message);
+
           const { error: roleError } = await adminClient
             .from("user_roles")
-            .upsert({ user_id, role }, { onConflict: "user_id" });
+            .insert({ user_id, role });
           if (roleError) throw new Error(roleError.message);
         }
 
