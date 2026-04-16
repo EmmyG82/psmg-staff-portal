@@ -167,13 +167,25 @@ const DashboardPage = () => {
                 </Card>
               ) : (
                 <div className="space-y-2">
-                  {dayShifts.map((shift) => (
-                    <Card key={shift.id} className={isToday ? "border-primary/30 bg-primary/5" : ""}>
+                  {dayShifts.map((shift) => {
+                    const statusBg = shift.status === "staff_cancelled"
+                      ? "bg-red-600 text-white border-red-600"
+                      : shift.status === "admin_cancelled"
+                      ? "bg-black text-white border-black"
+                      : "bg-green-600 text-white border-green-600";
+                    const formatTime = (t: string) => {
+                      const [h, m] = t.split(":").map(Number);
+                      const period = h >= 12 ? "pm" : "am";
+                      const hour = h % 12 || 12;
+                      return `${hour}:${String(m).padStart(2, "0")}${period}`;
+                    };
+                    return (
+                    <Card key={shift.id} className={statusBg}>
                       <CardContent className="p-3">
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-4 text-sm">
                           <span className="flex items-center gap-1">
                             <Clock className="h-3.5 w-3.5" />
-                            10:00am – Until Required
+                            {formatTime(shift.start_time)} – Until Required
                           </span>
                           <span className="flex items-center gap-1">
                             <MapPin className="h-3.5 w-3.5" />
@@ -181,11 +193,12 @@ const DashboardPage = () => {
                           </span>
                         </div>
                         {shift.notes && (
-                          <p className="text-xs text-muted-foreground mt-1">{shift.notes}</p>
+                          <p className="text-xs mt-1 opacity-90">{shift.notes}</p>
                         )}
                       </CardContent>
                     </Card>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

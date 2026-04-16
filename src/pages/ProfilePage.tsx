@@ -12,7 +12,7 @@ import { Loader2, User, Phone, Mail, Lock } from "lucide-react";
 
 const ProfilePage = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [fullName, setFullName] = useState(user?.name || "");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState(user?.email || "");
@@ -102,7 +102,8 @@ const ProfilePage = () => {
           title: "Password changed successfully",
           description: "Please log in with your new password.",
         });
-        setTimeout(() => navigate("/login"), 500);
+        await logout();
+        window.location.replace("/login");
       }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "An unexpected error occurred.";
