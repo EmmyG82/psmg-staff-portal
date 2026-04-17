@@ -45,6 +45,9 @@ const RosterPage = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<ShiftRow | null>(null);
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; staffId: string; date: string } | null>(null);
+  const [cancelNote, setCancelNote] = useState("");
 
   const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -61,7 +64,7 @@ const RosterPage = () => {
         .order("start_time");
 
       if (!isAdmin) {
-        query = query.eq("staff_id", user!.id);
+        query = query.eq("staff_id", user!.id).eq("published", true);
       }
 
       const { data, error } = await query;
@@ -86,12 +89,6 @@ const RosterPage = () => {
     enabled: staffIds.length > 0,
   });
 
-  const staffNameMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    staffProfiles.forEach((p) => { map[p.user_id] = p.full_name; });
-    return map;
-  }, [staffProfiles]);
-
   const { data: staffList = [] } = useQuery({
     queryKey: ["staff-list"],
     queryFn: async () => {
@@ -105,6 +102,13 @@ const RosterPage = () => {
     },
     enabled: isAdmin,
   });
+
+  const staffNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    staffList.forEach((p) => { map[p.user_id] = p.full_name; });
+    staffProfiles.forEach((p) => { map[p.user_id] = p.full_name; });
+    return map;
+  }, [staffList, staffProfiles]);
 
   // Fetch unavailability for the visible week
   const { data: unavailability = [] } = useQuery({
@@ -219,14 +223,16 @@ const RosterPage = () => {
   };
 
   const statusMutation = useMutation({
-    mutationFn: async ({ id, status, staffId, date }: { id: string; status: string; staffId: string; date: string }) => {
-      const { error } = await supabase.from("shifts").update({ status, published: false }).eq("id", id);
+    mutationFn: async ({ id, status, staffId, date, notes }: { id: string; status: string; staffId: string; date: string; notes?: string }) => {
+      const updateData: { status: string; published: boolean; notes?: string } = { status, published: false };
+      if (notes !== undefined) updateData.notes = notes;
+      const { error } = await supabase.from("shifts").update(updateData).eq("id", id);
       if (error) throw error;
 
       await notifyAffectedStaff(
         [staffId],
         "Roster Change",
-        `Your shift on ${format(parseISO(date), "EEE d MMM")} was updated to ${status.replace("_", " ")}.`,
+        `Your shift on ${format(parseISO(date), "EEE d MMM")} was updated to ${status.replace(/_/g, " ")}.`,
         "shift"
       );
     },
@@ -401,6 +407,50 @@ const RosterPage = () => {
         )}
       </div>
 
+      {isAdmin && cancelTarget && (
+        <Dialog open={cancelDialogOpen} onOpenChange={(open) => { setCancelDialogOpen(open); if (!open) { setCancelTarget(null); setCancelNote(""); } }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cancel Shift</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="cancel-note">Cancellation Note (optional)</Label>
+                <Input
+                  id="cancel-note"
+                  value={cancelNote}
+                  onChange={(e) => setCancelNote(e.target.value)}
+                  placeholder="Reason for cancellation"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                  disabled={statusMutation.isPending}
+                  onClick={() => {
+                    statusMutation.mutate({
+                      id: cancelTarget.id,
+                      status: "cancelled",
+                      staffId: cancelTarget.staffId,
+                      date: cancelTarget.date,
+                      notes: cancelNote || undefined,
+                    });
+                    setCancelDialogOpen(false);
+                    setCancelTarget(null);
+                    setCancelNote("");
+                  }}
+                >
+                  {statusMutation.isPending ? "Saving..." : "Confirm Cancellation"}
+                </Button>
+                <Button variant="outline" onClick={() => { setCancelDialogOpen(false); setCancelTarget(null); setCancelNote(""); }}>
+                  Back
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {isAdmin && (
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingShift(null); }}>
           <DialogContent>
@@ -469,6 +519,13 @@ const RosterPage = () => {
         </Button>
       </div>
 
+      <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-muted-foreground px-1">
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-green-600 shrink-0" />Scheduled</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-blue-600 shrink-0" />Message If Required</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-black shrink-0" />Day Off / Unavailable</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-600 shrink-0" />Cancelled</span>
+      </div>
+
       {isLoading ? (
         <p className="text-sm text-muted-foreground text-center py-8">Loading shifts...</p>
       ) : (
@@ -479,15 +536,21 @@ const RosterPage = () => {
             const dayDate = format(day, "yyyy-MM-dd");
             const unavailableStaffForDay = unavailableStaffByDate[dayDate] ?? new Set<string>();
             const alreadyAllocatedStaffForDay = alreadyAllocatedStaffByDate[dayDate] ?? new Set<string>();
+            // Staff without a shift entry who are marked unavailable (admin view only)
+            const unavailableWithoutShift = isAdmin
+              ? [...unavailableStaffForDay].filter((id) => !dayShifts.some((s) => s.staff_id === id))
+              : [];
+            const hasAnyContent = dayShifts.length > 0 || unavailableWithoutShift.length > 0;
 
             return (
               <div key={day.toISOString()}>
-                <div className="mb-1.5 flex items-center justify-between gap-2">
-                  <p className={`text-xs font-semibold uppercase tracking-wider ${isToday ? "text-primary" : "text-muted-foreground"}`}>
-                    {format(day, "EEEE d MMM")}
-                    {isToday && <span className="ml-1.5 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">Today</span>}
-                  </p>
-                  {isAdmin && (
+                {/* Day header – shown for admin; hidden for staff (date is inside card) */}
+                {isAdmin && (
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <p className={`text-xs font-semibold uppercase tracking-wider ${isToday ? "text-primary" : "text-muted-foreground"}`}>
+                      {format(day, "EEEE d MMM")}
+                      {isToday && <span className="ml-1.5 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">Today</span>}
+                    </p>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -517,35 +580,48 @@ const RosterPage = () => {
                         })}
                       </DropdownMenuContent>
                     </DropdownMenu>
-                  )}
-                </div>
-                {dayShifts.length === 0 ? (
-                  <Card className="border-dashed">
-                    <CardContent className="p-3 text-center text-sm text-muted-foreground">
-                      No shifts
-                    </CardContent>
-                  </Card>
+                  </div>
+                )}
+
+                {!hasAnyContent ? (
+                  isAdmin ? (
+                    <Card className="border-dashed">
+                      <CardContent className="p-3 text-center text-sm text-muted-foreground">
+                        No shifts
+                      </CardContent>
+                    </Card>
+                  ) : null
                 ) : (
                   <div className="space-y-2">
                     {dayShifts.map((shift) => {
-                      const statusBg = shift.status === "staff_cancelled"
+                      const statusBg = shift.status === "cancelled"
+                        ? "bg-red-600 text-white border-red-600"
+                        : shift.status === "staff_cancelled"
                         ? "bg-red-600 text-white border-red-600"
                         : shift.status === "admin_cancelled"
                         ? "bg-black text-white border-black"
+                        : shift.status === "day_off"
+                        ? "bg-black text-white border-black"
+                        : shift.status === "message_required"
+                        ? "bg-blue-600 text-white border-blue-600"
                         : "bg-green-600 text-white border-green-600";
-                      const isCancelled = shift.status === "staff_cancelled" || shift.status === "admin_cancelled";
-                      const statusLabel = shift.status === "staff_cancelled"
-                        ? "Staff Cancelled"
-                        : shift.status === "admin_cancelled"
-                        ? "Admin Cancelled"
+                      const isNotScheduled = shift.status === "cancelled" || shift.status === "staff_cancelled" || shift.status === "admin_cancelled" || shift.status === "day_off";
+                      const statusLabel = shift.status === "cancelled" || shift.status === "staff_cancelled"
+                        ? "Cancelled"
+                        : shift.status === "admin_cancelled" || shift.status === "day_off"
+                        ? "Day Off / Unavailable"
+                        : shift.status === "message_required"
+                        ? "Message If Required"
                         : "10:00am – Until Required";
+                      // Notes shown on scheduled and cancelled shifts; staff_cancelled retained for backwards compatibility
+                      const showNotes = (shift.status === "scheduled" || shift.status === "cancelled" || shift.status === "staff_cancelled") && !!shift.notes;
 
-                      return (
-                        <Card key={shift.id} className={`${statusBg} ${isAdmin && !shift.published ? "border-dashed opacity-90" : ""}`}>
-                          <CardContent className="p-3">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                {isAdmin && (
+                      if (isAdmin) {
+                        return (
+                          <Card key={shift.id} className={`${statusBg} ${!shift.published ? "border-dashed opacity-90" : ""}`}>
+                            <CardContent className="p-3">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-1">
                                     <p className="text-sm font-semibold">
                                       {staffNameMap[shift.staff_id] ?? "Unknown"}
@@ -554,18 +630,16 @@ const RosterPage = () => {
                                       <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full">Draft</span>
                                     )}
                                   </div>
-                                )}
-                                <div className="flex items-center gap-4 text-sm">
-                                  <span className="flex items-center gap-1">
-                                    <Clock className="h-3.5 w-3.5" />
-                                    {statusLabel}
-                                  </span>
+                                  <div className="flex items-center gap-4 text-sm">
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="h-3.5 w-3.5" />
+                                      {statusLabel}
+                                    </span>
+                                  </div>
+                                  {showNotes && (
+                                    <p className="text-xs mt-1 opacity-80">{shift.notes}</p>
+                                  )}
                                 </div>
-                                {shift.notes && (
-                                  <p className="text-xs mt-1 opacity-80">{shift.notes}</p>
-                                )}
-                              </div>
-                              {isAdmin && (
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" size="icon" className="h-7 w-7 text-inherit hover:bg-white/20">
@@ -573,17 +647,24 @@ const RosterPage = () => {
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    {shift.published && shift.status === "scheduled" && (
+                                    {shift.status === "scheduled" && (
                                       <>
-                                        <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "staff_cancelled", staffId: shift.staff_id, date: shift.date })}>
-                                          <span className="h-3 w-3 rounded-full bg-red-600 mr-2" /> Staff Cancelled
+                                        <DropdownMenuItem onClick={() => {
+                                          setCancelTarget({ id: shift.id, staffId: shift.staff_id, date: shift.date });
+                                          setCancelNote(shift.notes ?? "");
+                                          setCancelDialogOpen(true);
+                                        }}>
+                                          <span className="h-3 w-3 rounded-full bg-red-600 mr-2 shrink-0" /> Cancel Shift
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "admin_cancelled", staffId: shift.staff_id, date: shift.date })}>
-                                          <span className="h-3 w-3 rounded-full bg-black mr-2" /> Admin Cancelled
+                                        <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "day_off", staffId: shift.staff_id, date: shift.date })}>
+                                          <span className="h-3 w-3 rounded-full bg-black border border-gray-400 mr-2 shrink-0" /> Day Off / Unavailable
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "message_required", staffId: shift.staff_id, date: shift.date })}>
+                                          <span className="h-3 w-3 rounded-full bg-blue-600 mr-2 shrink-0" /> Message If Required
                                         </DropdownMenuItem>
                                       </>
                                     )}
-                                    {isCancelled && (
+                                    {(isNotScheduled || shift.status === "message_required") && (
                                       <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "scheduled", staffId: shift.staff_id, date: shift.date })}>
                                         <Clock className="h-4 w-4 mr-2" /> Restore Shift
                                       </DropdownMenuItem>
@@ -596,12 +677,54 @@ const RosterPage = () => {
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      }
+
+                      // ── Staff view: day/date box on the left + shift details ──
+                      return (
+                        <Card key={shift.id} className={`${statusBg} overflow-hidden`}>
+                          <CardContent className="p-0 flex items-stretch">
+                            <div className="flex flex-col items-center justify-center bg-white/20 px-3 py-3 border-r border-white/30 min-w-[56px] text-center">
+                              <span className="text-[11px] font-bold uppercase leading-tight">{format(parseISO(shift.date), "EEE")}</span>
+                              <span className="text-2xl font-bold leading-tight">{format(parseISO(shift.date), "d")}</span>
+                              <span className="text-[11px] leading-tight">{format(parseISO(shift.date), "MMM")}</span>
+                            </div>
+                            <div className="flex-1 p-3">
+                              <div className="flex items-center gap-4 text-sm">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  {statusLabel}
+                                </span>
+                              </div>
+                              {showNotes && (
+                                <p className="text-xs mt-1 opacity-80">{shift.notes}</p>
                               )}
                             </div>
                           </CardContent>
                         </Card>
                       );
                     })}
+
+                    {/* Auto-display unavailable staff without a shift entry (admin only) */}
+                    {isAdmin && unavailableWithoutShift.map((staffId) => (
+                      <Card key={`unavail-${dayDate}-${staffId}`} className="bg-black text-white border-black">
+                        <CardContent className="p-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-sm font-semibold">{staffNameMap[staffId] ?? "Unknown"}</p>
+                            <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full">Unavailable</span>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm">
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3.5 w-3.5" />
+                              Day Off / Unavailable
+                            </span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
                 )}
               </div>
