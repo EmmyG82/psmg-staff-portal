@@ -85,13 +85,14 @@ const DashboardPage = () => {
     enabled: isAdmin && !!user,
   });
 
-  // Staff-specific queries
+  // Staff-specific queries — fetch last 2 weeks (previous week + current week)
   const { data: myShifts = [] } = useQuery({
     queryKey: ["dashboard-my-shifts", user?.id],
     queryFn: async () => {
-      const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-      const weekEnd = addDays(weekStart, 6);
-      const { data, error } = await supabase.from("shifts").select("*").eq("staff_id", user!.id).gte("date", format(weekStart, "yyyy-MM-dd")).lte("date", format(weekEnd, "yyyy-MM-dd")).order("date", { ascending: true }).order("start_time", { ascending: true });
+      const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+      const twoWeeksStart = addDays(currentWeekStart, -7);
+      const weekEnd = addDays(currentWeekStart, 6);
+      const { data, error } = await supabase.from("shifts").select("*").eq("staff_id", user!.id).gte("date", format(twoWeeksStart, "yyyy-MM-dd")).lte("date", format(weekEnd, "yyyy-MM-dd")).order("date", { ascending: true }).order("start_time", { ascending: true });
       if (error) throw error;
       return data;
     },
@@ -137,15 +138,16 @@ const DashboardPage = () => {
     );
   }
 
-  // Staff dashboard
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  // Staff dashboard — show last 2 weeks (previous week + current week)
+  const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const twoWeeksStart = addDays(currentWeekStart, -7);
+  const weekDays = Array.from({ length: 14 }, (_, i) => addDays(twoWeeksStart, i));
 
   return (
     <div className="p-4 space-y-4">
       <div>
         <h1 className="text-xl font-bold text-foreground">Hey, {user.name.split(" ")[0]} 👋</h1>
-        <p className="text-sm text-muted-foreground">Your weekly roster</p>
+        <p className="text-sm text-muted-foreground">Your roster (last 2 weeks)</p>
       </div>
 
       <div className="space-y-3">
@@ -168,10 +170,13 @@ const DashboardPage = () => {
               ) : (
                 <div className="space-y-2">
                   {dayShifts.map((shift) => {
-                    const statusBg = shift.status === "staff_cancelled"
+                    const isCancelled = ["cancelled", "staff_cancelled", "admin_cancelled"].includes(shift.status);
+                    const statusBg = isCancelled
                       ? "bg-red-600 text-white border-red-600"
-                      : shift.status === "admin_cancelled"
+                      : shift.status === "day_off"
                       ? "bg-black text-white border-black"
+                      : shift.status === "message_required"
+                      ? "bg-blue-600 text-white border-blue-600"
                       : "bg-green-600 text-white border-green-600";
                     const formatTime = (t: string) => {
                       const [h, m] = t.split(":").map(Number);
