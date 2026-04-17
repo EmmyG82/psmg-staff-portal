@@ -1,7 +1,8 @@
 name: Create Issue from TODO keyword
+
 on:
   push:
-    branches: [ main ]
+    branches: [main]
 
 permissions:
   contents: read
@@ -19,34 +20,34 @@ jobs:
         run: |
           # Get the last commit message (works for single-commit pushes)
           msg=$(git log -1 --pretty=%B)
-          echo "commit_message<<EOF" >> $GITHUB_OUTPUT
-          echo "$msg" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "commit_message<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$msg" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Check for keyword
         id: check
         run: |
           echo "Checking for @makeAnIssue in commit message..."
           if echo "${{ steps.commit.outputs.commit_message }}" | grep -q "@makeAnIssue"; then
-            echo "found=true" >> $GITHUB_OUTPUT
+            echo "found=true" >> "$GITHUB_OUTPUT"
           else
-            echo "found=false" >> $GITHUB_OUTPUT
+            echo "found=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Write issue body to file
-  if: steps.check.outputs.found == 'true'
-  run: |
-    cat > issue-body.md <<'EOF'
-    ${{ steps.commit.outputs.commit_message }}
-    EOF
+        if: steps.check.outputs.found == 'true'
+        run: |
+          cat > issue-body.md <<'EOF'
+          ${{ steps.commit.outputs.commit_message }}
+          EOF
 
-      + name: Create issue when keyword present
-  if: steps.check.outputs.found == 'true'
-  uses: peter-evans/create-issue-from-file@v5
-  with:
-    title: ${{ github.event.head_commit.message || steps.commit.outputs.commit_message }}
-    content-filepath: issue-body.md
-    labels: todo
-    assignees: EmmyG82
-  env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create issue when keyword present
+        if: steps.check.outputs.found == 'true'
+        uses: peter-evans/create-issue-from-file@v5
+        with:
+          title: ${{ github.event.head_commit.message || steps.commit.outputs.commit_message }}
+          content-filepath: issue-body.md
+          labels: todo
+          assignees: EmmyG82
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
