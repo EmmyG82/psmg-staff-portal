@@ -1,0 +1,3 @@
+[33m7cc0651[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m chore: update Supabase project env and CLI dependency
+[33m2f445c2[m Stabilize staff admin functions and auth flow
+[33m42228d5[m Merge pull request #4 from EmmyG82/copilot/fix-cli-issues-adding-staff
