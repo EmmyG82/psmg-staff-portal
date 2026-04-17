@@ -33,15 +33,20 @@ jobs:
             echo "found=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create issue when keyword present
-        if: steps.check.outputs.found == 'true'
-        uses: peter-evans/create-issue@v4
-        with:
-          # Use the commit message as the issue title (first line) and body
-          title: ${{ github.event.head_commit.message || steps.commit.outputs.commit_message }}
-          body: |
-            ${{ steps.commit.outputs.commit_message }}
-          labels: todo
-          assignees: EmmyG82
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Write issue body to file
+  if: steps.check.outputs.found == 'true'
+  run: |
+    cat > issue-body.md <<'EOF'
+    ${{ steps.commit.outputs.commit_message }}
+    EOF
+
+- name: Create issue when keyword present
+  if: steps.check.outputs.found == 'true'
+  uses: peter-evans/create-issue-from-file@v5
+  with:
+    title: ${{ github.event.head_commit.message || steps.commit.outputs.commit_message }}
+    content-filepath: issue-body.md
+    labels: todo
+    assignees: EmmyG82
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
