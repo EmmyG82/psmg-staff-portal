@@ -45,6 +45,9 @@ const RosterPage = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<ShiftRow | null>(null);
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; staffId: string; date: string } | null>(null);
+  const [cancelNote, setCancelNote] = useState("");
 
   const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -219,14 +222,16 @@ const RosterPage = () => {
   };
 
   const statusMutation = useMutation({
-    mutationFn: async ({ id, status, staffId, date }: { id: string; status: string; staffId: string; date: string }) => {
-      const { error } = await supabase.from("shifts").update({ status, published: false }).eq("id", id);
+    mutationFn: async ({ id, status, staffId, date, notes }: { id: string; status: string; staffId: string; date: string; notes?: string }) => {
+      const updateData: { status: string; published: boolean; notes?: string } = { status, published: false };
+      if (notes !== undefined) updateData.notes = notes;
+      const { error } = await supabase.from("shifts").update(updateData).eq("id", id);
       if (error) throw error;
 
       await notifyAffectedStaff(
         [staffId],
         "Roster Change",
-        `Your shift on ${format(parseISO(date), "EEE d MMM")} was updated to ${status.replace("_", " ")}.`,
+        `Your shift on ${format(parseISO(date), "EEE d MMM")} was updated to ${status.replace(/_/g, " ")}.`,
         "shift"
       );
     },
@@ -401,6 +406,50 @@ const RosterPage = () => {
         )}
       </div>
 
+      {isAdmin && cancelTarget && (
+        <Dialog open={cancelDialogOpen} onOpenChange={(open) => { setCancelDialogOpen(open); if (!open) { setCancelTarget(null); setCancelNote(""); } }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cancel Shift</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="cancel-note">Cancellation Note (optional)</Label>
+                <Input
+                  id="cancel-note"
+                  value={cancelNote}
+                  onChange={(e) => setCancelNote(e.target.value)}
+                  placeholder="Reason for cancellation"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                  disabled={statusMutation.isPending}
+                  onClick={() => {
+                    statusMutation.mutate({
+                      id: cancelTarget.id,
+                      status: "cancelled",
+                      staffId: cancelTarget.staffId,
+                      date: cancelTarget.date,
+                      notes: cancelNote || undefined,
+                    });
+                    setCancelDialogOpen(false);
+                    setCancelTarget(null);
+                    setCancelNote("");
+                  }}
+                >
+                  {statusMutation.isPending ? "Saving..." : "Confirm Cancellation"}
+                </Button>
+                <Button variant="outline" onClick={() => { setCancelDialogOpen(false); setCancelTarget(null); setCancelNote(""); }}>
+                  Back
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {isAdmin && (
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingShift(null); }}>
           <DialogContent>
@@ -469,6 +518,13 @@ const RosterPage = () => {
         </Button>
       </div>
 
+      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground px-1">
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-green-600 shrink-0" />Scheduled</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-black shrink-0" />Day Off / Unavailable</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-600 shrink-0" />Cancelled</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-blue-600 shrink-0" />Message Required</span>
+      </div>
+
       {isLoading ? (
         <p className="text-sm text-muted-foreground text-center py-8">Loading shifts...</p>
       ) : (
@@ -528,16 +584,24 @@ const RosterPage = () => {
                 ) : (
                   <div className="space-y-2">
                     {dayShifts.map((shift) => {
-                      const statusBg = shift.status === "staff_cancelled"
+                      const statusBg = shift.status === "cancelled"
+                        ? "bg-red-600 text-white border-red-600"
+                        : shift.status === "staff_cancelled"
                         ? "bg-red-600 text-white border-red-600"
                         : shift.status === "admin_cancelled"
                         ? "bg-black text-white border-black"
+                        : shift.status === "day_off"
+                        ? "bg-black text-white border-black"
+                        : shift.status === "message_required"
+                        ? "bg-blue-600 text-white border-blue-600"
                         : "bg-green-600 text-white border-green-600";
-                      const isCancelled = shift.status === "staff_cancelled" || shift.status === "admin_cancelled";
-                      const statusLabel = shift.status === "staff_cancelled"
-                        ? "Staff Cancelled"
-                        : shift.status === "admin_cancelled"
-                        ? "Admin Cancelled"
+                      const isNotScheduled = shift.status === "cancelled" || shift.status === "staff_cancelled" || shift.status === "admin_cancelled" || shift.status === "day_off";
+                      const statusLabel = shift.status === "cancelled" || shift.status === "staff_cancelled"
+                        ? "Cancelled"
+                        : shift.status === "admin_cancelled" || shift.status === "day_off"
+                        ? "Day Off / Unavailable"
+                        : shift.status === "message_required"
+                        ? "Message Required"
                         : "10:00am – Until Required";
 
                       return (
@@ -573,17 +637,24 @@ const RosterPage = () => {
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    {shift.published && shift.status === "scheduled" && (
+                                    {shift.status === "scheduled" && (
                                       <>
-                                        <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "staff_cancelled", staffId: shift.staff_id, date: shift.date })}>
-                                          <span className="h-3 w-3 rounded-full bg-red-600 mr-2" /> Staff Cancelled
+                                        <DropdownMenuItem onClick={() => {
+                                          setCancelTarget({ id: shift.id, staffId: shift.staff_id, date: shift.date });
+                                          setCancelNote(shift.notes ?? "");
+                                          setCancelDialogOpen(true);
+                                        }}>
+                                          <span className="h-3 w-3 rounded-full bg-red-600 mr-2 shrink-0" /> Cancel Shift
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "admin_cancelled", staffId: shift.staff_id, date: shift.date })}>
-                                          <span className="h-3 w-3 rounded-full bg-black mr-2" /> Admin Cancelled
+                                        <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "day_off", staffId: shift.staff_id, date: shift.date })}>
+                                          <span className="h-3 w-3 rounded-full bg-black border border-gray-400 mr-2 shrink-0" /> Day Off / Unavailable
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "message_required", staffId: shift.staff_id, date: shift.date })}>
+                                          <span className="h-3 w-3 rounded-full bg-blue-600 mr-2 shrink-0" /> Message Required
                                         </DropdownMenuItem>
                                       </>
                                     )}
-                                    {isCancelled && (
+                                    {(isNotScheduled || shift.status === "message_required") && (
                                       <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "scheduled", staffId: shift.staff_id, date: shift.date })}>
                                         <Clock className="h-4 w-4 mr-2" /> Restore Shift
                                       </DropdownMenuItem>
