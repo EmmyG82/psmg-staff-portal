@@ -594,14 +594,14 @@ const RosterPage = () => {
                 ) : (
                   <div className="space-y-2">
                     {dayShifts.map((shift) => {
-                      const statusBg = ["cancelled", "staff_cancelled", "admin_cancelled"].includes(shift.status)
+                      const isCancelled = ["cancelled", "staff_cancelled", "admin_cancelled"].includes(shift.status);
+                      const statusBg = isCancelled
                         ? "bg-red-600 text-white border-red-600"
                         : shift.status === "day_off"
                         ? "bg-black text-white border-black"
                         : shift.status === "message_required"
                         ? "bg-blue-600 text-white border-blue-600"
                         : "bg-green-600 text-white border-green-600";
-                      const isCancelled = ["cancelled", "staff_cancelled", "admin_cancelled"].includes(shift.status);
                       const isNotScheduled = isCancelled || shift.status === "day_off";
                       const statusLabel = isCancelled
                         ? "Cancelled"
