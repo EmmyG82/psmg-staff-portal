@@ -168,10 +168,12 @@ const DashboardPage = () => {
               ) : (
                 <div className="space-y-2">
                   {dayShifts.map((shift) => {
-                    const statusBg = shift.status === "staff_cancelled"
+                    const statusBg = ["cancelled", "staff_cancelled", "admin_cancelled"].includes(shift.status)
                       ? "bg-red-600 text-white border-red-600"
-                      : shift.status === "admin_cancelled"
+                      : shift.status === "day_off"
                       ? "bg-black text-white border-black"
+                      : shift.status === "message_required"
+                      ? "bg-blue-600 text-white border-blue-600"
                       : "bg-green-600 text-white border-green-600";
                     const formatTime = (t: string) => {
                       const [h, m] = t.split(":").map(Number);

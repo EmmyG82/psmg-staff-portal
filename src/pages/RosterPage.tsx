@@ -594,27 +594,24 @@ const RosterPage = () => {
                 ) : (
                   <div className="space-y-2">
                     {dayShifts.map((shift) => {
-                      const statusBg = shift.status === "cancelled"
+                      const statusBg = ["cancelled", "staff_cancelled", "admin_cancelled"].includes(shift.status)
                         ? "bg-red-600 text-white border-red-600"
-                        : shift.status === "staff_cancelled"
-                        ? "bg-red-600 text-white border-red-600"
-                        : shift.status === "admin_cancelled"
-                        ? "bg-black text-white border-black"
                         : shift.status === "day_off"
                         ? "bg-black text-white border-black"
                         : shift.status === "message_required"
                         ? "bg-blue-600 text-white border-blue-600"
                         : "bg-green-600 text-white border-green-600";
-                      const isNotScheduled = shift.status === "cancelled" || shift.status === "staff_cancelled" || shift.status === "admin_cancelled" || shift.status === "day_off";
-                      const statusLabel = shift.status === "cancelled" || shift.status === "staff_cancelled"
+                      const isCancelled = ["cancelled", "staff_cancelled", "admin_cancelled"].includes(shift.status);
+                      const isNotScheduled = isCancelled || shift.status === "day_off";
+                      const statusLabel = isCancelled
                         ? "Cancelled"
-                        : shift.status === "admin_cancelled" || shift.status === "day_off"
+                        : shift.status === "day_off"
                         ? "Day Off / Unavailable"
                         : shift.status === "message_required"
                         ? "Message If Required"
                         : "10:00am – Until Required";
-                      // Notes shown on scheduled and cancelled shifts; staff_cancelled retained for backwards compatibility
-                      const showNotes = (shift.status === "scheduled" || shift.status === "cancelled" || shift.status === "staff_cancelled") && !!shift.notes;
+                      // Notes shown on scheduled and all cancelled shifts
+                      const showNotes = (shift.status === "scheduled" || isCancelled) && !!shift.notes;
 
                       if (isAdmin) {
                         return (
