@@ -40,7 +40,7 @@ jobs:
     ${{ steps.commit.outputs.commit_message }}
     EOF
 
-- name: Create issue when keyword present
+      - name: Create issue when keyword present
   if: steps.check.outputs.found == 'true'
   uses: peter-evans/create-issue-from-file@v5
   with:
