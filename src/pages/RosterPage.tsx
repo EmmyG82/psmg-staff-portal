@@ -64,7 +64,7 @@ const RosterPage = () => {
         .order("start_time");
 
       if (!isAdmin) {
-        query = query.eq("staff_id", user!.id);
+        query = query.eq("staff_id", user!.id).eq("published", true);
       }
 
       const { data, error } = await query;
@@ -89,12 +89,6 @@ const RosterPage = () => {
     enabled: staffIds.length > 0,
   });
 
-  const staffNameMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    staffProfiles.forEach((p) => { map[p.user_id] = p.full_name; });
-    return map;
-  }, [staffProfiles]);
-
   const { data: staffList = [] } = useQuery({
     queryKey: ["staff-list"],
     queryFn: async () => {
@@ -108,6 +102,13 @@ const RosterPage = () => {
     },
     enabled: isAdmin,
   });
+
+  const staffNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    staffList.forEach((p) => { map[p.user_id] = p.full_name; });
+    staffProfiles.forEach((p) => { map[p.user_id] = p.full_name; });
+    return map;
+  }, [staffList, staffProfiles]);
 
   // Fetch unavailability for the visible week
   const { data: unavailability = [] } = useQuery({
@@ -518,11 +519,11 @@ const RosterPage = () => {
         </Button>
       </div>
 
-      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground px-1">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-muted-foreground px-1">
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-green-600 shrink-0" />Scheduled</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-blue-600 shrink-0" />Message If Required</span>
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-black shrink-0" />Day Off / Unavailable</span>
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-600 shrink-0" />Cancelled</span>
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-blue-600 shrink-0" />Message Required</span>
       </div>
 
       {isLoading ? (
@@ -535,15 +536,21 @@ const RosterPage = () => {
             const dayDate = format(day, "yyyy-MM-dd");
             const unavailableStaffForDay = unavailableStaffByDate[dayDate] ?? new Set<string>();
             const alreadyAllocatedStaffForDay = alreadyAllocatedStaffByDate[dayDate] ?? new Set<string>();
+            // Staff without a shift entry who are marked unavailable (admin view only)
+            const unavailableWithoutShift = isAdmin
+              ? [...unavailableStaffForDay].filter((id) => !dayShifts.some((s) => s.staff_id === id))
+              : [];
+            const hasAnyContent = dayShifts.length > 0 || unavailableWithoutShift.length > 0;
 
             return (
               <div key={day.toISOString()}>
-                <div className="mb-1.5 flex items-center justify-between gap-2">
-                  <p className={`text-xs font-semibold uppercase tracking-wider ${isToday ? "text-primary" : "text-muted-foreground"}`}>
-                    {format(day, "EEEE d MMM")}
-                    {isToday && <span className="ml-1.5 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">Today</span>}
-                  </p>
-                  {isAdmin && (
+                {/* Day header – shown for admin; hidden for staff (date is inside card) */}
+                {isAdmin && (
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <p className={`text-xs font-semibold uppercase tracking-wider ${isToday ? "text-primary" : "text-muted-foreground"}`}>
+                      {format(day, "EEEE d MMM")}
+                      {isToday && <span className="ml-1.5 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">Today</span>}
+                    </p>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -573,14 +580,17 @@ const RosterPage = () => {
                         })}
                       </DropdownMenuContent>
                     </DropdownMenu>
-                  )}
-                </div>
-                {dayShifts.length === 0 ? (
-                  <Card className="border-dashed">
-                    <CardContent className="p-3 text-center text-sm text-muted-foreground">
-                      No shifts
-                    </CardContent>
-                  </Card>
+                  </div>
+                )}
+
+                {!hasAnyContent ? (
+                  isAdmin ? (
+                    <Card className="border-dashed">
+                      <CardContent className="p-3 text-center text-sm text-muted-foreground">
+                        No shifts
+                      </CardContent>
+                    </Card>
+                  ) : null
                 ) : (
                   <div className="space-y-2">
                     {dayShifts.map((shift) => {
@@ -601,15 +611,17 @@ const RosterPage = () => {
                         : shift.status === "admin_cancelled" || shift.status === "day_off"
                         ? "Day Off / Unavailable"
                         : shift.status === "message_required"
-                        ? "Message Required"
+                        ? "Message If Required"
                         : "10:00am – Until Required";
+                      // Notes shown on scheduled and cancelled shifts; staff_cancelled retained for backwards compatibility
+                      const showNotes = (shift.status === "scheduled" || shift.status === "cancelled" || shift.status === "staff_cancelled") && !!shift.notes;
 
-                      return (
-                        <Card key={shift.id} className={`${statusBg} ${isAdmin && !shift.published ? "border-dashed opacity-90" : ""}`}>
-                          <CardContent className="p-3">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                {isAdmin && (
+                      if (isAdmin) {
+                        return (
+                          <Card key={shift.id} className={`${statusBg} ${!shift.published ? "border-dashed opacity-90" : ""}`}>
+                            <CardContent className="p-3">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-1">
                                     <p className="text-sm font-semibold">
                                       {staffNameMap[shift.staff_id] ?? "Unknown"}
@@ -618,18 +630,16 @@ const RosterPage = () => {
                                       <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full">Draft</span>
                                     )}
                                   </div>
-                                )}
-                                <div className="flex items-center gap-4 text-sm">
-                                  <span className="flex items-center gap-1">
-                                    <Clock className="h-3.5 w-3.5" />
-                                    {statusLabel}
-                                  </span>
+                                  <div className="flex items-center gap-4 text-sm">
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="h-3.5 w-3.5" />
+                                      {statusLabel}
+                                    </span>
+                                  </div>
+                                  {showNotes && (
+                                    <p className="text-xs mt-1 opacity-80">{shift.notes}</p>
+                                  )}
                                 </div>
-                                {shift.notes && (
-                                  <p className="text-xs mt-1 opacity-80">{shift.notes}</p>
-                                )}
-                              </div>
-                              {isAdmin && (
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" size="icon" className="h-7 w-7 text-inherit hover:bg-white/20">
@@ -650,7 +660,7 @@ const RosterPage = () => {
                                           <span className="h-3 w-3 rounded-full bg-black border border-gray-400 mr-2 shrink-0" /> Day Off / Unavailable
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => statusMutation.mutate({ id: shift.id, status: "message_required", staffId: shift.staff_id, date: shift.date })}>
-                                          <span className="h-3 w-3 rounded-full bg-blue-600 mr-2 shrink-0" /> Message Required
+                                          <span className="h-3 w-3 rounded-full bg-blue-600 mr-2 shrink-0" /> Message If Required
                                         </DropdownMenuItem>
                                       </>
                                     )}
@@ -667,12 +677,54 @@ const RosterPage = () => {
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      }
+
+                      // ── Staff view: day/date box on the left + shift details ──
+                      return (
+                        <Card key={shift.id} className={`${statusBg} overflow-hidden`}>
+                          <CardContent className="p-0 flex items-stretch">
+                            <div className="flex flex-col items-center justify-center bg-white/20 px-3 py-3 border-r border-white/30 min-w-[56px] text-center">
+                              <span className="text-[11px] font-bold uppercase leading-tight">{format(parseISO(shift.date), "EEE")}</span>
+                              <span className="text-2xl font-bold leading-tight">{format(parseISO(shift.date), "d")}</span>
+                              <span className="text-[11px] leading-tight">{format(parseISO(shift.date), "MMM")}</span>
+                            </div>
+                            <div className="flex-1 p-3">
+                              <div className="flex items-center gap-4 text-sm">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  {statusLabel}
+                                </span>
+                              </div>
+                              {showNotes && (
+                                <p className="text-xs mt-1 opacity-80">{shift.notes}</p>
                               )}
                             </div>
                           </CardContent>
                         </Card>
                       );
                     })}
+
+                    {/* Auto-display unavailable staff without a shift entry (admin only) */}
+                    {isAdmin && unavailableWithoutShift.map((staffId) => (
+                      <Card key={`unavail-${dayDate}-${staffId}`} className="bg-black text-white border-black">
+                        <CardContent className="p-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-sm font-semibold">{staffNameMap[staffId] ?? "Unknown"}</p>
+                            <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full">Unavailable</span>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm">
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3.5 w-3.5" />
+                              Day Off / Unavailable
+                            </span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
                 )}
               </div>
