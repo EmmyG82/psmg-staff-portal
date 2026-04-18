@@ -57,7 +57,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let cancelled = false;
 
-    const clearCorruptAuthStorage = () => {
+    // Called on SIGNED_OUT to remove any leftover auth tokens from storage.
+    // Supabase v2 never throws for expired sessions — it fires SIGNED_OUT
+    // asynchronously, so we must clear here rather than in a catch block.
+    const clearAuthStorage = () => {
       try {
         const keysToRemove: string[] = [];
         for (let i = 0; i < localStorage.length; i += 1) {
@@ -92,38 +95,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
+    // Supabase v2 fires INITIAL_SESSION immediately on subscription, delivering
+    // the current session state. Using only onAuthStateChange (no separate
+    // getSession() call) eliminates the race condition where two concurrent
+    // initializers increment the generation counter against each other, which
+    // could leave loading=false but user=null even when a valid session exists.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
         const gen = ++authGenRef.current;
         try {
           if (session?.user) {
             await hydrateUser(session.user, gen);
-          } else if (!cancelled) {
-            setUser(null);
+          } else {
+            if (event === "SIGNED_OUT") {
+              // Proactively clear stale tokens so the next page load starts clean.
+              clearAuthStorage();
+            }
+            if (!cancelled) setUser(null);
           }
         } finally {
           if (!cancelled) setLoading(false);
         }
       }
     );
-
-    const initializeSession = async () => {
-      const gen = ++authGenRef.current;
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          await hydrateUser(session.user, gen);
-        }
-      } catch (error) {
-        console.error("Failed to restore session; clearing local auth storage", error);
-        clearCorruptAuthStorage();
-        if (!cancelled) setUser(null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    initializeSession();
 
     return () => {
       cancelled = true;
