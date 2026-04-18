@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -15,6 +15,7 @@ const MessagesPage = () => {
   const queryClient = useQueryClient();
   const [newMessage, setNewMessage] = useState("");
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [replyContent, setReplyContent] = useState("");
 
   const { data: messages = [], isLoading } = useQuery({
     queryKey: ["messages"],
@@ -27,13 +28,16 @@ const MessagesPage = () => {
       if (error) throw error;
 
       const authorIds = [...new Set(data.map((m) => m.author_id))];
+
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("user_id, full_name");
+        .select("user_id, full_name")
+        .in("user_id", authorIds);
 
       const { data: roles } = await supabase
         .from("user_roles")
-        .select("user_id, role");
+        .select("user_id, role")
+        .in("user_id", authorIds);
 
       const nameMap = Object.fromEntries((profiles || []).map((p) => [p.user_id, p.full_name]));
       const roleMap = Object.fromEntries((roles || []).map((r) => [r.user_id, r.role]));
@@ -46,11 +50,6 @@ const MessagesPage = () => {
     },
     enabled: !!user,
   });
-
-  const replyTarget = useMemo(
-    () => (replyTo ? messages.find((m) => m.id === replyTo) ?? null : null),
-    [messages, replyTo],
-  );
 
   const notifyMessagePosted = async (content: string, isReply: boolean) => {
     const truncatedContent = content.length > 120 ? `${content.slice(0, 117)}...` : content;
@@ -69,21 +68,24 @@ const MessagesPage = () => {
   };
 
   const postMutation = useMutation({
-    mutationFn: async (content: string) => {
-      const isReply = !!replyTo;
-      const payload = replyTo
-        ? { author_id: user!.id, content, parent_id: replyTo }
+    mutationFn: async ({ content, parentId }: { content: string; parentId?: string }) => {
+      const payload = parentId
+        ? { author_id: user!.id, content, parent_id: parentId }
         : { author_id: user!.id, content };
 
       const { error } = await supabase.from("messages").insert(payload);
       if (error) throw error;
 
-      await notifyMessagePosted(content, isReply);
+      await notifyMessagePosted(content, !!parentId);
     },
-    onSuccess: () => {
+    onSuccess: (_, { parentId }) => {
       queryClient.invalidateQueries({ queryKey: ["messages"] });
-      setNewMessage("");
-      setReplyTo(null);
+      if (parentId) {
+        setReplyContent("");
+        setReplyTo(null);
+      } else {
+        setNewMessage("");
+      }
       toast.success("Message posted");
     },
     onError: (error: Error) => toast.error(error.message || "Failed to post message"),
@@ -116,44 +118,20 @@ const MessagesPage = () => {
     <div className="p-4 space-y-4">
       <h1 className="text-xl font-bold text-foreground">Messages</h1>
 
+      {/* Top-level compose form */}
       <Card>
         <CardContent className="p-3">
-          {replyTo && (() => {
-            const snippet = replyTarget
-              ? replyTarget.content.length > 80
-                ? `${replyTarget.content.slice(0, 77)}…`
-                : replyTarget.content
-              : null;
-            return (
-              <div className="mb-2 p-2 bg-muted/50 rounded text-sm text-muted-foreground flex items-start justify-between gap-2">
-                <span className="min-w-0">
-                  <span className="font-medium">Replying</span>
-                  {snippet && (
-                    <span className="ml-1 italic truncate">"{snippet}"</span>
-                  )}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 shrink-0 text-xs"
-                  onClick={() => setReplyTo(null)}
-                >
-                  Cancel
-                </Button>
-              </div>
-            );
-          })()}
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (newMessage.trim()) postMutation.mutate(newMessage.trim());
+              if (newMessage.trim()) postMutation.mutate({ content: newMessage.trim() });
             }}
             className="flex gap-2"
           >
             <Textarea
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder={replyTo ? "Write a reply..." : (isAdmin ? "Post an announcement..." : "Write a message...")}
+              placeholder={isAdmin ? "Post an announcement..." : "Write a message..."}
               className="min-h-[44px] max-h-24 resize-none"
               rows={1}
             />
@@ -214,7 +192,10 @@ const MessagesPage = () => {
                           variant="ghost"
                           size="sm"
                           className="h-7 text-xs text-muted-foreground gap-1"
-                          onClick={() => setReplyTo(msg.id)}
+                          onClick={() => {
+                            setReplyTo(replyTo === msg.id ? null : msg.id);
+                            setReplyContent("");
+                          }}
                         >
                           <Reply className="h-3 w-3" /> Reply
                         </Button>
@@ -262,7 +243,10 @@ const MessagesPage = () => {
                             variant="ghost"
                             size="sm"
                             className="h-6 text-xs text-muted-foreground gap-1"
-                            onClick={() => setReplyTo(reply.parent_id ?? reply.id)}
+                            onClick={() => {
+                              setReplyTo(replyTo === msg.id ? null : msg.id);
+                              setReplyContent("");
+                            }}
                           >
                             <Reply className="h-3 w-3" /> Reply
                           </Button>
@@ -276,6 +260,54 @@ const MessagesPage = () => {
                       </CardContent>
                     </Card>
                   ))}
+
+                  {/* Inline reply form — appears directly under the thread being replied to */}
+                  {replyTo === msg.id && (
+                    <Card className="ml-8 border-l-2 border-primary/30">
+                      <CardContent className="p-3">
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Replying to <span className="font-medium">{msg.authorName}</span>
+                        </p>
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            if (replyContent.trim()) {
+                              postMutation.mutate({ content: replyContent.trim(), parentId: msg.id });
+                            }
+                          }}
+                          className="flex gap-2"
+                        >
+                          <Textarea
+                            value={replyContent}
+                            onChange={(e) => setReplyContent(e.target.value)}
+                            placeholder="Write a reply..."
+                            className="min-h-[44px] max-h-24 resize-none"
+                            rows={1}
+                            autoFocus
+                          />
+                          <div className="flex flex-col gap-1 shrink-0">
+                            <Button
+                              type="submit"
+                              size="icon"
+                              className="h-10 w-10"
+                              disabled={!replyContent.trim() || postMutation.isPending}
+                            >
+                              {postMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-xs"
+                              onClick={() => { setReplyTo(null); setReplyContent(""); }}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </form>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               );
             })}
