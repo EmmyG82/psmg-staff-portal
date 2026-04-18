@@ -16,6 +16,7 @@ const ProfilePage = () => {
   const [fullName, setFullName] = useState(user?.name || "");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState(user?.email || "");
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
@@ -70,8 +71,9 @@ const ProfilePage = () => {
             : error.message;
         toast({ title: "Error", description: message, variant: "destructive" });
       } else {
-        toast({ title: "Confirmation email sent", description: "Check your inbox to confirm the new email address and then re-login." });
-        setTimeout(() => navigate("/login"), 500);
+        toast({ title: "Confirmation email sent", description: "Check your inbox to confirm the new email address. You have been logged out." });
+        await logout();
+        navigate("/login");
       }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "An unexpected error occurred.";
@@ -82,6 +84,10 @@ const ProfilePage = () => {
   };
 
   const handleChangePassword = async () => {
+    if (!currentPassword) {
+      toast({ title: "Error", description: "Please enter your current password", variant: "destructive" });
+      return;
+    }
     if (newPassword.length < 6) {
       toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
       return;
@@ -92,10 +98,19 @@ const ProfilePage = () => {
     }
     setSavingPassword(true);
     try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user!.email,
+        password: currentPassword,
+      });
+      if (signInError) {
+        toast({ title: "Error", description: "Current password is incorrect.", variant: "destructive" });
+        return;
+      }
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) {
         toast({ title: "Error", description: error.message, variant: "destructive" });
       } else {
+        setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
         toast({
@@ -103,7 +118,7 @@ const ProfilePage = () => {
           description: "Please log in with your new password.",
         });
         await logout();
-        window.location.replace("/login");
+        navigate("/login");
       }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "An unexpected error occurred.";
@@ -163,6 +178,10 @@ const ProfilePage = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="currentPassword">Current Password</Label>
+            <Input id="currentPassword" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Enter current password" />
+          </div>
           <div className="space-y-2">
             <Label htmlFor="newPassword">New Password</Label>
             <Input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min 6 characters" />
