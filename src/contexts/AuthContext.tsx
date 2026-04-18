@@ -92,6 +92,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             role: "staff",
           });
         }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     };
 
@@ -100,21 +102,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // getSession() call) eliminates the race condition where two concurrent
     // initializers increment the generation counter against each other, which
     // could leave loading=false but user=null even when a valid session exists.
+    //
+    // The callback is intentionally synchronous (not async). Supabase v2
+    // awaits async auth-state-change listeners before resolving operations
+    // like updateUser/signOut. Keeping this callback sync means those
+    // operations resolve immediately and don't block on our DB queries.
+    // hydrateUser runs in the background and calls setLoading(false) when done.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         const gen = ++authGenRef.current;
-        try {
-          if (session?.user) {
-            await hydrateUser(session.user, gen);
-          } else {
-            if (event === "SIGNED_OUT") {
-              // Proactively clear stale tokens so the next page load starts clean.
-              clearAuthStorage();
-            }
-            if (!cancelled) setUser(null);
+        if (session?.user) {
+          hydrateUser(session.user, gen);
+        } else {
+          if (event === "SIGNED_OUT") {
+            // Proactively clear stale tokens so the next page load starts clean.
+            clearAuthStorage();
           }
-        } finally {
-          if (!cancelled) setLoading(false);
+          if (!cancelled) {
+            setUser(null);
+            setLoading(false);
+          }
         }
       }
     );
