@@ -1,0 +1,15 @@
+filter.lfs.clean=git-lfs clean -- %f
+filter.lfs.smudge=git-lfs smudge -- %f
+filter.lfs.process=git-lfs filter-process
+filter.lfs.required=true
+credential.https://github.com.helper=
+credential.https://github.com.helper=!/usr/bin/gh auth git-credential
+credential.https://gist.github.com.helper=
+credential.https://gist.github.com.helper=!/usr/bin/gh auth git-credential
+user.name=EmmyG82
+user.email=thegeorges8182@gmail.com
+user.signingkey=
+commit.gpgsign=false
+gpg.program=true
+gpg.format=openpgp
+gpg.ssh.defaultkeycommand=
