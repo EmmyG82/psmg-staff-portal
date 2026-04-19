@@ -186,17 +186,19 @@ const DashboardPage = () => {
                     };
                     return (
                     <Card key={shift.id} className={statusBg}>
-                      <CardContent className="p-3">
-                        <div className="flex items-center gap-4 text-sm">
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3.5 w-3.5" />
-                            {formatTime(shift.start_time)} – Until Required
-                        </div>
-                        {shift.notes && (
-                          <p className="text-xs mt-1 opacity-90">{shift.notes}</p>
-                        )}
-                      </CardContent>
-                    </Card>
+  <CardContent className="p-3">
+    <div className="flex items-center gap-4 text-sm">
+      <span className="flex items-center gap-1">
+        <Clock className="h-3.5 w-3.5" />
+        {formatTime(shift.start_time)} – Until Required
+      </span>
+    </div>
+
+    {shift.notes && (
+      <p className="text-xs mt-1 opacity-90">{shift.notes}</p>
+    )}
+  </CardContent>
+</Card>
                     );
                   })}
                 </div>
