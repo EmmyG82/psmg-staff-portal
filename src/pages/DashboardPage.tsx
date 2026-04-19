@@ -85,14 +85,12 @@ const DashboardPage = () => {
     enabled: isAdmin && !!user,
   });
 
-  // Staff-specific queries — fetch last 2 weeks (previous week + current week)
   const { data: myShifts = [] } = useQuery({
     queryKey: ["dashboard-my-shifts", user?.id],
     queryFn: async () => {
       const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-      const twoWeeksStart = addDays(currentWeekStart, -7);
       const weekEnd = addDays(currentWeekStart, 6);
-      const { data, error } = await supabase.from("shifts").select("*").eq("staff_id", user!.id).gte("date", format(twoWeeksStart, "yyyy-MM-dd")).lte("date", format(weekEnd, "yyyy-MM-dd")).order("date", { ascending: true }).order("start_time", { ascending: true });
+      const { data, error } = await supabase.from("shifts").select("*").eq("staff_id", user!.id).gte("date", format(CurrentWeekStart, "yyyy-MM-dd")).lte("date", format(weekEnd, "yyyy-MM-dd")).order("date", { ascending: true }).order("start_time", { ascending: true });
       if (error) throw error;
       return data;
     },
@@ -138,16 +136,14 @@ const DashboardPage = () => {
     );
   }
 
-  // Staff dashboard — show last 2 weeks (previous week + current week)
   const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-  const twoWeeksStart = addDays(currentWeekStart, -7);
   const weekDays = Array.from({ length: 14 }, (_, i) => addDays(twoWeeksStart, i));
 
   return (
     <div className="p-4 space-y-4">
       <div>
         <h1 className="text-xl font-bold text-foreground">Hey, {user.name.split(" ")[0]} 👋</h1>
-        <p className="text-sm text-muted-foreground">Your roster (last 2 weeks)</p>
+        <p className="text-sm text-muted-foreground">Your roster</p>
       </div>
 
       <div className="space-y-3">
