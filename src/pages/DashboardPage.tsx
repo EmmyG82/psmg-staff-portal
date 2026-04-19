@@ -90,7 +90,7 @@ const DashboardPage = () => {
     queryFn: async () => {
       const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
       const weekEnd = addDays(currentWeekStart, 6);
-      const { data, error } = await supabase.from("shifts").select("*").eq("staff_id", user!.id).gte("date", format(CurrentWeekStart, "yyyy-MM-dd")).lte("date", format(weekEnd, "yyyy-MM-dd")).order("date", { ascending: true }).order("start_time", { ascending: true });
+      const { data, error } = await supabase.from("shifts").select("*").eq("staff_id", user!.id).eq("published", true).gte("date", format(currentWeekStart, "yyyy-MM-dd")).lte("date", format(weekEnd, "yyyy-MM-dd")).order("date", { ascending: true }).order("start_time", { ascending: true });
       if (error) throw error;
       return data;
     },
@@ -137,7 +137,7 @@ const DashboardPage = () => {
   }
 
   const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-  const weekDays = Array.from({ length: 14 }, (_, i) => addDays(twoWeeksStart, i));
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
 
   return (
     <div className="p-4 space-y-4">
