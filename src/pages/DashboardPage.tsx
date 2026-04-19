@@ -69,7 +69,7 @@ const DashboardPage = () => {
       const { count } = await supabase.from("messages").select("*", { count: "exact", head: true });
       return count || 0;
     },
-    enabled: !!user,
+    enabled:  !!user,
   });
 
   const { data: recentMessages = [] } = useQuery<DashboardMessage[]>({
@@ -80,7 +80,7 @@ const DashboardPage = () => {
       const authorIds = [...new Set(data.map((m) => m.author_id))];
       const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").in("user_id", authorIds);
       const nameMap = Object.fromEntries((profiles || []).map((p) => [p.user_id, p.full_name]));
-      return data.map((m) => ({ ...m, authorName: nameMap[m.author_id] || "Unknown" }));
+      return data.map((m) => ({ ...m, authorName: nameMap[m.author_id] || "The Invisible One" }));
     },
     enabled: isAdmin && !!user,
   });
@@ -186,22 +186,19 @@ const DashboardPage = () => {
                     };
                     return (
                     <Card key={shift.id} className={statusBg}>
-                      <CardContent className="p-3">
-                        <div className="flex items-center gap-4 text-sm">
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3.5 w-3.5" />
-                            {formatTime(shift.start_time)} – Until Required
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3.5 w-3.5" />
-                            {shift.area}
-                          </span>
-                        </div>
-                        {shift.notes && (
-                          <p className="text-xs mt-1 opacity-90">{shift.notes}</p>
-                        )}
-                      </CardContent>
-                    </Card>
+  <CardContent className="p-3">
+    <div className="flex items-center gap-4 text-sm">
+      <span className="flex items-center gap-1">
+        <Clock className="h-3.5 w-3.5" />
+        {formatTime(shift.start_time)} – Until Required
+      </span>
+    </div>
+
+    {shift.notes && (
+      <p className="text-xs mt-1 opacity-90">{shift.notes}</p>
+    )}
+  </CardContent>
+</Card>
                     );
                   })}
                 </div>
