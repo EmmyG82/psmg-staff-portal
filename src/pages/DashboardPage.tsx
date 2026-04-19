@@ -93,7 +93,7 @@ const DashboardPage = () => {
       const twoWeeksStart = addDays(currentWeekStart, -7);
       const weekEnd = addDays(currentWeekStart, 6);
       const { data, error } = await supabase.from("shifts").select("*").eq("staff_id", user!.id).gte("date", format(twoWeeksStart, "yyyy-MM-dd")).lte("date", format(weekEnd, "yyyy-MM-dd")).order("date", { ascending: true }).order("start_time", { ascending: true });
-  3    if (error) throw error;
+      if (error) throw error;
       return data;
     },
     enabled: !isAdmin && !!user,
