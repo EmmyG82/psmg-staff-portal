@@ -1,14 +1,3 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
+# @makeAnIssue Revisit robots policy per environment before production go-live.
 User-agent: *
-Allow: /
+Disallow: /
