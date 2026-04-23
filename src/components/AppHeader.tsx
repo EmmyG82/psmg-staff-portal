@@ -1,23 +1,27 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
 import NotificationBell from "@/components/NotificationBell";
 
 const AppHeader = () => {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/45 bg-white/55 text-foreground shadow-[0_8px_30px_rgba(31,35,51,0.06)] backdrop-blur-xl supports-[backdrop-filter]:bg-white/45">
-      <div className="flex items-center justify-between px-4 h-14">
-        <div className="flex items-center gap-2">
-          <span className="text-lg font-bold tracking-tight">Parkside</span>
-          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium capitalize text-primary">
-            {user?.role}
-          </span>
-        </div>
-        <div className="flex items-center gap-1">
+    <header className="sticky top-0 z-40 border-b border-white/45 bg-white/55 text-foreground shadow-[0_8px_30px_rgba(31,35,51,0.06)] backdrop-blur-x0 supports-[backdrop-filter]:bg-white/45">
+      <div className="relative flex items-center justify-between px-4 h-14 w-full">
+
+        {/* 3 — LEFT: Notification Bell */}
+        <div>
           <NotificationBell />
+        </div>
+
+        {/* 1 — CENTER: Logo (bigger + centered) */}
+        <div className="absolute left-1/2 -translate-x-1/2 text-xl font-bold tracking-tight">
+          <img src="/logo.svg" alt="Parkside Logo" className="h-20" />
+        </div>
+
+        {/* 2 — RIGHT: Logout */}
+        <div>
           <Button
             variant="ghost"
             size="sm"
@@ -28,6 +32,7 @@ const AppHeader = () => {
             <span className="hidden sm:inline">Logout</span>
           </Button>
         </div>
+
       </div>
     </header>
   );

@@ -50,20 +50,7 @@ const LoginPage = () => {
         {/* Logo */}
         <div className="flex justify-center mb-8">
           <div className="bg-indigo-900 p-6 rounded-full">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="white"
-              className="w-10 h-10"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 21h18M5 21V9a1 1 0 011-1h2m8 0h2a1 1 0 011 1v12M9 21V5a1 1 0 011-1h4a1 1 0 011 1v16"
-              />
-            </svg>
+            <img src="logo.png" alt="Parkside Staff Portal logo: building icon representing the motel management system" className="w-10 h-10" />
           </div>
         </div>
 
