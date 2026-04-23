@@ -48,9 +48,9 @@ const LoginPage = () => {
       <div className="w-full max-w-md text-center text-white">
 
         {/* Logo */}
-        <div className="flex justify-center mb-8">
-          <div className="bg-indigo-900 p-6 rounded-full">
-            <img src="logo.png" alt="Parkside Staff Portal logo: building icon representing the motel management system" className="w-10 h-10" />
+        <div className="flex justify-center mb-1">
+          <div className="linear-gradient(135deg, rgb(255, 79, 134) 0%, rgb(255, 123, 184) 25%, rgb(195, 139, 255) 50%, rgb(138, 157, 255) 75%, rgb(123, 201, 255) 100%);">
+            <img src="logo.png" alt="Parkside Staff Portal logo" className="w-20 h-20" />
           </div>
         </div>
 
@@ -63,7 +63,7 @@ const LoginPage = () => {
 
           {/* Email */}
           <div className="relative text-left">
-            <span className="absolute left-1 top-3 text-white/85">
+            <span className="absolute left-1 top-2 text-white/85">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
@@ -92,7 +92,7 @@ const LoginPage = () => {
 
           {/* Password */}
           <div className="relative text-left">
-            <span className="absolute left-1 top-3 text-white/85">
+            <span className="absolute left-1 top-2 text-white/85">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
