@@ -25,6 +25,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+type PushSubscriptionRow = {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+};
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -57,7 +63,8 @@ Deno.serve(async (req: Request) => {
   const { data: subscriptions, error } = await adminClient
     .from("push_subscriptions")
     .select("endpoint, p256dh, auth")
-    .eq("user_id", user_id);
+    .eq("user_id", user_id)
+    .returns<PushSubscriptionRow[]>();
 
   if (error || !subscriptions || subscriptions.length === 0) {
     return new Response(JSON.stringify({ sent: 0 }), {
@@ -99,5 +106,3 @@ Deno.serve(async (req: Request) => {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });
-
-/// <reference lib="deno.ns" />
