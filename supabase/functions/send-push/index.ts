@@ -1,3 +1,5 @@
+/// <reference path="../_shared/edge-runtime.d.ts" />
+
 /**
  * send-push Edge Function
  *
