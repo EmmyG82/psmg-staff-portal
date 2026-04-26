@@ -29,16 +29,16 @@ export default function DailyJoke(): import("react/jsx-runtime").JSX.Element {
 
         const { data, error } = await Promise.race([jokePromise, timeoutPromise]);
 
+        if (!isMounted) return;
+
         if (error) {
           throw error;
         }
 
-        // TODO(@makeAnIssue): Dashboard reports occasional loading hang and false
-        // "No joke available today." fallback; verify RPC/data availability and
-        // fallback criteria so valid jokes are not dropped.
         const nextJoke = data?.joke_text?.trim();
         setJoke(nextJoke || "No joke available today.");
       } catch (error) {
+        if (!isMounted) return;
         console.error("Failed to load daily joke", error);
         setJoke("Could not load joke.");
       } finally {
@@ -57,9 +57,6 @@ export default function DailyJoke(): import("react/jsx-runtime").JSX.Element {
     return () => {
       isMounted = false;
       controller.abort();
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
     };
   }, []);
 
