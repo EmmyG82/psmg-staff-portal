@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { format, parseISO, startOfWeek, addDays, isSameDay } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import DailyJoke from "@/components/DailyJoke";
+import DailyJoke from "@/components/DailyJoke"
 
 function Dashboard() {
   return (
@@ -153,7 +153,8 @@ const DashboardPage = () => {
     <div className="p-4 space-y-4">
       <div className="text-center">
         <h1 className="text-xl font-bold text-foreground">Hey, {user.name.split(" ")[0]} 👋</h1>
-        <p className="text-sm text-muted-foreground">Your roster</p>
+        <p className="text-sm text-muted-foreground">
+        <DailyJoke /></p>
       </div>
 
       <div className="space-y-3">
