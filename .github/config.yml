@@ -2,10 +2,8 @@ todo:
   keyword: "@makeAnIssue"
 
 @makeAnIssue:
-  title: "New Issue from TODO"
-  body: |
-    A TODO marker triggered this issue.
-    Please review the related code and fix as needed.
+  title: "Dashboard daily joke hangs and falls back to no joke"
+  body: "Dashboard DailyJoke can get stuck on loading or show 'No joke available today' unexpectedly. Investigate current_joke query, timeout handling, and fallback conditions."
   assignees:
     - Emma
   labels:
