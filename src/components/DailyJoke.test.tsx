@@ -9,6 +9,20 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
+/** Build a mock that satisfies the query chain:
+ *  supabase.from(...).select(...).eq(...).maybeSingle()
+ *  where maybeSingle() is controlled via the returned vi.fn().
+ */
+function buildChainMock(maybeSingleImpl: () => unknown) {
+  return {
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        maybeSingle: vi.fn(maybeSingleImpl),
+      })),
+    })),
+  };
+}
+
 describe("DailyJoke", () => {
   const fromMock = supabase.from as unknown as Mock;
   const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -27,18 +41,9 @@ describe("DailyJoke", () => {
   });
 
   it("renders the daily joke when data is returned", async () => {
-    const abortSignalMock = vi.fn().mockResolvedValue({
-      data: { joke_text: "Test joke" },
-      error: null,
-    });
-
-    fromMock.mockReturnValue({
-      select: vi.fn(() => ({
-        maybeSingle: vi.fn(() => ({
-          abortSignal: abortSignalMock,
-        })),
-      })),
-    });
+    fromMock.mockReturnValue(
+      buildChainMock(() => Promise.resolve({ data: { content: "Test joke" }, error: null })),
+    );
 
     render(<DailyJoke />);
 
@@ -46,18 +51,9 @@ describe("DailyJoke", () => {
   });
 
   it("shows fallback text when no joke is available", async () => {
-    const abortSignalMock = vi.fn().mockResolvedValue({
-      data: null,
-      error: null,
-    });
-
-    fromMock.mockReturnValue({
-      select: vi.fn(() => ({
-        maybeSingle: vi.fn(() => ({
-          abortSignal: abortSignalMock,
-        })),
-      })),
-    });
+    fromMock.mockReturnValue(
+      buildChainMock(() => Promise.resolve({ data: null, error: null })),
+    );
 
     render(<DailyJoke />);
 
@@ -65,15 +61,9 @@ describe("DailyJoke", () => {
   });
 
   it("shows an error message when the request fails", async () => {
-    const abortSignalMock = vi.fn().mockRejectedValue(new Error("network"));
-
-    fromMock.mockReturnValue({
-      select: vi.fn(() => ({
-        maybeSingle: vi.fn(() => ({
-          abortSignal: abortSignalMock,
-        })),
-      })),
-    });
+    fromMock.mockReturnValue(
+      buildChainMock(() => Promise.reject(new Error("network"))),
+    );
 
     render(<DailyJoke />);
 
@@ -81,19 +71,10 @@ describe("DailyJoke", () => {
     expect(consoleErrorSpy).toHaveBeenCalled();
   });
 
-  it("shows fallback text when joke_text is whitespace only", async () => {
-    const abortSignalMock = vi.fn().mockResolvedValue({
-      data: { joke_text: "   " },
-      error: null,
-    });
-
-    fromMock.mockReturnValue({
-      select: vi.fn(() => ({
-        maybeSingle: vi.fn(() => ({
-          abortSignal: abortSignalMock,
-        })),
-      })),
-    });
+  it("shows fallback text when content is whitespace only", async () => {
+    fromMock.mockReturnValue(
+      buildChainMock(() => Promise.resolve({ data: { content: "   " }, error: null })),
+    );
 
     render(<DailyJoke />);
 
@@ -104,21 +85,15 @@ describe("DailyJoke", () => {
     vi.useFakeTimers();
 
     // Never resolves — simulates a request that hangs indefinitely
-    const abortSignalMock = vi.fn().mockReturnValue(new Promise(() => {}));
-
-    fromMock.mockReturnValue({
-      select: vi.fn(() => ({
-        maybeSingle: vi.fn(() => ({
-          abortSignal: abortSignalMock,
-        })),
-      })),
-    });
+    fromMock.mockReturnValue(
+      buildChainMock(() => new Promise(() => {})),
+    );
 
     render(<DailyJoke />);
 
     expect(screen.getByText("Loading joke...")).toBeInTheDocument();
 
-    // Advance past the 8-second timeout
+    // Advance past the 8-second inner timeout
     await act(async () => {
       vi.advanceTimersByTime(8100);
     });
@@ -127,22 +102,17 @@ describe("DailyJoke", () => {
     expect(consoleErrorSpy).toHaveBeenCalled();
   });
 
-  it("does not call setJoke after the component unmounts", async () => {
+  it("does not update state after the component unmounts", async () => {
     let resolveRequest!: (value: { data: null; error: null }) => void;
 
-    const abortSignalMock = vi.fn().mockReturnValue(
-      new Promise<{ data: null; error: null }>((resolve) => {
-        resolveRequest = resolve;
-      }),
+    fromMock.mockReturnValue(
+      buildChainMock(
+        () =>
+          new Promise<{ data: null; error: null }>((resolve) => {
+            resolveRequest = resolve;
+          }),
+      ),
     );
-
-    fromMock.mockReturnValue({
-      select: vi.fn(() => ({
-        maybeSingle: vi.fn(() => ({
-          abortSignal: abortSignalMock,
-        })),
-      })),
-    });
 
     const { unmount } = render(<DailyJoke />);
 
