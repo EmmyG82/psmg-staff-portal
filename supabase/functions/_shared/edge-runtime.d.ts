@@ -3,8 +3,7 @@ declare module "https://esm.sh/@supabase/supabase-js@2.49.4" {
 }
 
 declare module "npm:web-push@3.6.7" {
-  import webPush from "web-push";
-  export default webPush;
+  export * from "npm:web-push@3.6.7";
 }
 
 declare namespace Deno {
