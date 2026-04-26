@@ -10,15 +10,27 @@ export default function DailyJoke(): import("react/jsx-runtime").JSX.Element {
   useEffect(() => {
     const controller = new AbortController();
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let safetyTimeoutId: ReturnType<typeof setTimeout> | undefined;
     let isMounted = true;
+    let isSettled = false;
+
+    safetyTimeoutId = setTimeout(() => {
+      if (!isMounted || isSettled) {
+        return;
+      }
+
+      controller.abort();
+      setJoke("Could not load joke.");
+      setIsLoading(false);
+    }, JOKE_REQUEST_TIMEOUT_MS + 500);
 
     const fetchJoke = async () => {
       try {
         const jokePromise = supabase
-          .from("current_joke")
-          .select("joke_text")
-          .maybeSingle()
-          .abortSignal(controller.signal);
+          .from("messages")
+          .select("content")
+          .eq("id", "current_joke")
+          .maybeSingle();
 
         const timeoutPromise = new Promise<never>((_, reject) => {
           timeoutId = setTimeout(() => {
@@ -35,15 +47,21 @@ export default function DailyJoke(): import("react/jsx-runtime").JSX.Element {
           throw error;
         }
 
-        const nextJoke = data?.joke_text?.trim();
+        const nextJoke = data?.content?.trim();
         setJoke(nextJoke || "No joke available today.");
       } catch (error) {
         if (!isMounted) return;
         console.error("Failed to load daily joke", error);
         setJoke("Could not load joke.");
       } finally {
+        isSettled = true;
+
         if (timeoutId) {
           clearTimeout(timeoutId);
+        }
+
+        if (safetyTimeoutId) {
+          clearTimeout(safetyTimeoutId);
         }
 
         if (isMounted) {
@@ -57,6 +75,9 @@ export default function DailyJoke(): import("react/jsx-runtime").JSX.Element {
     return () => {
       isMounted = false;
       controller.abort();
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
   }, []);
 

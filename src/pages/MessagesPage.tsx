@@ -31,7 +31,7 @@ const MessagesPage = () => {
 
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("user_id, full_name")
+        .select("user_id, full_name, email")
         .in("user_id", authorIds);
 
       const { data: roles } = await supabase
@@ -39,7 +39,12 @@ const MessagesPage = () => {
         .select("user_id, role")
         .in("user_id", authorIds);
 
-      const nameMap = Object.fromEntries((profiles || []).map((p) => [p.user_id, p.full_name]));
+      const nameMap = Object.fromEntries(
+        (profiles || []).map((p) => [
+          p.user_id,
+          p.full_name || p.email?.split("@")[0] || "Unknown",
+        ])
+      );
       const roleMap = Object.fromEntries((roles || []).map((r) => [r.user_id, r.role]));
 
       return data.map((m) => ({
