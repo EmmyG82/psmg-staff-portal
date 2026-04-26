@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      jokes: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          joke_text: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          joke_text: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          joke_text?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           author_id: string
@@ -235,7 +256,12 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      current_joke: {
+        Row: {
+          joke_text: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {
