@@ -1,3 +1,5 @@
+/// <reference path="../_shared/edge-runtime.d.ts" />
+
 /**
  * send-push Edge Function
  *
@@ -23,6 +25,12 @@ import webPush from "npm:web-push@3.6.7";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+type PushSubscriptionRow = {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
 };
 
 Deno.serve(async (req: Request) => {
@@ -57,7 +65,8 @@ Deno.serve(async (req: Request) => {
   const { data: subscriptions, error } = await adminClient
     .from("push_subscriptions")
     .select("endpoint, p256dh, auth")
-    .eq("user_id", user_id);
+    .eq("user_id", user_id)
+    .returns<PushSubscriptionRow[]>();
 
   if (error || !subscriptions || subscriptions.length === 0) {
     return new Response(JSON.stringify({ sent: 0 }), {
@@ -99,5 +108,3 @@ Deno.serve(async (req: Request) => {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });
-
-/// <reference lib="deno.ns" />

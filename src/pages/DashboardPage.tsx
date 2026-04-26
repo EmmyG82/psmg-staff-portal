@@ -5,6 +5,16 @@ import { Link } from "react-router-dom";
 import { format, parseISO, startOfWeek, addDays, isSameDay } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import DailyJoke from "@/components/DailyJoke"
+
+function Dashboard() {
+  return (
+    <div>
+      <DailyJoke />
+      {/* other dashboard stuff */}
+    </div>
+  );
+}
 
 const StatCard = ({ icon: Icon, label, value, to, color, loading }: { icon: LucideIcon; label: string; value: string | number; to: string; color: string; loading?: boolean }) => (
   <Link to={to}>
@@ -102,9 +112,9 @@ const DashboardPage = () => {
   if (isAdmin) {
     return (
       <div className="p-4 space-y-4">
-        <div>
+        <div className="text-center">
           <h1 className="text-xl font-bold text-foreground">G'day, {user.name.split(" ")[0]}</h1>
-          <p className="text-sm text-muted-foreground">Admin Dashboard</p>
+          <p className="text-sm text-muted-foreground">Welcome to your Dashboard</p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <StatCard icon={Users} label="Staff Members" value={staffCount} to="/staff" color="bg-primary/10 text-primary" loading={loadingStaff} />
@@ -141,9 +151,10 @@ const DashboardPage = () => {
 
   return (
     <div className="p-4 space-y-4">
-      <div>
+      <div className="text-center">
         <h1 className="text-xl font-bold text-foreground">Hey, {user.name.split(" ")[0]} 👋</h1>
-        <p className="text-sm text-muted-foreground">Your roster</p>
+        <p className="text-sm text-muted-foreground">
+        <DailyJoke /></p>
       </div>
 
       <div className="space-y-3">
