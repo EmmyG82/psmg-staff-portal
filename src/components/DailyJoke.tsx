@@ -78,6 +78,9 @@ export default function DailyJoke(): import("react/jsx-runtime").JSX.Element {
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
+      if (safetyTimeoutId) {
+        clearTimeout(safetyTimeoutId);
+      }
     };
   }, []);
 
